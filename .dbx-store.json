@@ -1,0 +1,27 @@
+{
+  "name": "OPC UA",
+  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values with data type aware decoding.",
+  "icon": "assets/plugin.svg",
+  "tags": [
+    "opcua",
+    "opc-ua",
+    "plc",
+    "industrial",
+    "iot",
+    "scada"
+  ],
+  "permissions": [
+    "host.workbench",
+    "host.connections:read"
+  ],
+  "source": "https://github.com/bobocha214/dbx-plugin-opcua",
+  "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
+  "license": "Apache-2.0",
+  "releaseNotes": "Initial release: OPC UA connection provider, address space browser, typed node reads and guarded writes.",
+  "localizations": {
+    "zh-CN": {
+      "name": "OPC UA",
+      "description": "浏览 PLC 和 OPC UA 服务器的地址空间，按数据类型读取并写入节点值。"
+    }
+  }
+}

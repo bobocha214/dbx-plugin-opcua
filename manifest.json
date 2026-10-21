@@ -1,11 +1,11 @@
 {
-  "$schema": "https://raw.githubusercontent.com/t8y2/dbx/plugin-sdk-v1/plugins/manifest.schema.json",
+  "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
   "manifest_version": 1,
   "id": "io.github.yuzhi.opcua",
   "name": "OPC UA",
   "version": "0.1.0",
   "publisher": "yuzhi",
-  "description": "OPC UA 客户端读写插件：连接 PLC/服务器，浏览地址空间，读取与写入节点值。",
+  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values.",
   "icon": "assets/plugin.svg",
   "engines": {
     "dbx": ">=0.5.68",
@@ -17,6 +17,10 @@
   ],
   "entrypoints": {
     "backend": {
+      "protocol_versions": [
+        1
+      ],
+      "transport": "stdio-jsonl",
       "executable": "bin/dbx-plugin-opcua"
     },
     "ui": {
@@ -31,7 +35,7 @@
       "label": "OPC UA",
       "icon": "assets/connection.svg",
       "database_type": "opcua",
-      "description": "连接到 OPC UA 服务器 / PLC。",
+      "description": "Connect to an OPC UA server such as a PLC or an industrial gateway.",
       "fields": [
         {
           "key": "display_name",
@@ -76,8 +80,8 @@
     {
       "type": "workbench",
       "id": "io.github.yuzhi.opcua.workbench",
-      "label": "OPC UA 浏览器",
-      "description": "浏览 OPC UA 地址空间，读取与写入节点值。",
+      "label": "OPC UA browser",
+      "description": "Browse the OPC UA address space, then read and write node values.",
       "icon": "assets/plugin.svg"
     }
   ],
