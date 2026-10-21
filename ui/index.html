@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OPC UA 浏览器</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="icon.svg" alt="OPC UA" width="22" height="22" />
+      <span>OPC UA 浏览器</span>
+    </div>
+    <div class="conn">
+      <select id="connSelect" title="选择 OPC UA 连接"></select>
+      <input id="connId" type="text" placeholder="连接 ID（手动）" title="宿主未暴露连接列表时手动填写" />
+      <button id="useBtn">使用此连接</button>
+      <span id="status" class="status">未连接</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="tree-pane">
+      <div class="pane-title">地址空间</div>
+      <ul id="tree" class="tree"></ul>
+    </section>
+
+    <section class="side-pane">
+      <div class="sub-pane detail-pane">
+        <div class="pane-title">节点详情</div>
+        <div id="detail" class="detail">
+          <p class="hint">在左侧选择一个节点查看详情。</p>
+        </div>
+      </div>
+
+      <div class="sub-pane watch-pane">
+        <div class="pane-title watch-title">
+          <span>监视点 <span id="watchCount" class="count">0</span></span>
+          <div class="watch-ctl">
+            <button id="pollBtn" title="按设定间隔轮询读取所有监视点">▶ 持续观察</button>
+            <select id="pollMs" title="轮询间隔">
+              <option value="200">200 ms</option>
+              <option value="500">500 ms</option>
+              <option value="1000" selected>1 s</option>
+              <option value="2000">2 s</option>
+              <option value="5000">5 s</option>
+            </select>
+            <button id="clearWatch" class="ghost" title="移除全部监视点">清空</button>
+          </div>
+        </div>
+        <div id="watchList" class="watch-list">
+          <p class="hint watch-empty">还没有监视点。在左侧树上点 Variable 节点的「＋」，或在详情面板点「加入监视列表」。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

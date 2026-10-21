@@ -1,0 +1,22 @@
+/dist/
+/.dbx-dev/
+.dbx-repository-signing-key.env
+.DS_Store
+*.log
+
+# Rust build artifacts
+backend/target/
+
+# Cargo.lock is intentionally NOT committed: `dbx-plugin package` builds with `--locked`
+# while injecting an (unused, since we don't depend on dbx-plugin-sdk) `[patch]` for
+# dbx-plugin-sdk. A committed lock then makes cargo refuse to build
+# ("cannot update the lock file because --locked was passed"). Without a lock the CLI
+# generates one during its own build, which is stable.
+backend/Cargo.lock
+
+# Editor
+.vscode/
+.idea/
+
+# Local WorkBuddy session notes (kept on disk, not part of the plugin source)
+.workbuddy/

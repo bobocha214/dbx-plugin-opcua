@@ -1,0 +1,107 @@
+{
+  "$schema": "https://raw.githubusercontent.com/t8y2/dbx/plugin-sdk-v1/plugins/manifest.schema.json",
+  "manifest_version": 1,
+  "id": "io.github.yuzhi.opcua",
+  "name": "OPC UA",
+  "version": "0.1.0",
+  "publisher": "yuzhi",
+  "description": "OPC UA 客户端读写插件：连接 PLC/服务器，浏览地址空间，读取与写入节点值。",
+  "icon": "assets/plugin.svg",
+  "engines": {
+    "dbx": ">=0.5.68",
+    "host_api": "1"
+  },
+  "permissions": [
+    "host.workbench",
+    "host.connections:read"
+  ],
+  "entrypoints": {
+    "backend": {
+      "executable": "bin/dbx-plugin-opcua"
+    },
+    "ui": {
+      "root": "ui",
+      "entry": "ui/index.html"
+    }
+  },
+  "contributions": [
+    {
+      "type": "connection-provider",
+      "id": "io.github.yuzhi.opcua.connection",
+      "label": "OPC UA",
+      "icon": "assets/connection.svg",
+      "database_type": "opcua",
+      "description": "连接到 OPC UA 服务器 / PLC。",
+      "fields": [
+        {
+          "key": "display_name",
+          "label": "Connection name",
+          "type": "text",
+          "default": "OPC UA",
+          "binding": "name",
+          "required": true
+        },
+        {
+          "key": "endpoint",
+          "label": "Host",
+          "type": "text",
+          "default": "localhost",
+          "binding": "host",
+          "required": true
+        },
+        {
+          "key": "port",
+          "label": "Port",
+          "type": "number",
+          "default": 4840,
+          "binding": "port",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "type": "text",
+          "binding": "username"
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "binding": "secret"
+        }
+      ],
+      "workbench": "io.github.yuzhi.opcua.workbench",
+      "capabilities": ["test", "connect", "disconnect"]
+    },
+    {
+      "type": "workbench",
+      "id": "io.github.yuzhi.opcua.workbench",
+      "label": "OPC UA 浏览器",
+      "description": "浏览 OPC UA 地址空间，读取与写入节点值。",
+      "icon": "assets/plugin.svg"
+    }
+  ],
+  "localizations": {
+    "zh-CN": {
+      "name": "OPC UA",
+      "description": "OPC UA 客户端读写插件：连接 PLC/服务器，浏览地址空间，读取与写入节点值。",
+      "contributions": {
+        "io.github.yuzhi.opcua.connection": {
+          "label": "OPC UA 连接",
+          "description": "连接到 OPC UA 服务器 / PLC。",
+          "fields": {
+            "display_name": { "label": "连接名称" },
+            "endpoint": { "label": "主机" },
+            "port": { "label": "端口" },
+            "username": { "label": "用户名" },
+            "password": { "label": "密码" }
+          }
+        },
+        "io.github.yuzhi.opcua.workbench": {
+          "label": "OPC UA 浏览器",
+          "description": "浏览 OPC UA 地址空间，读取与写入节点值。"
+        }
+      }
+    }
+  }
+}

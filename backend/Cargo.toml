@@ -1,0 +1,25 @@
+[package]
+name = "dbx-plugin-opcua"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[workspace]
+
+[[bin]]
+name = "dbx-plugin-opcua"
+path = "src/main.rs"
+
+[dependencies]
+async-opcua-client = "0.19"
+async-opcua-types = "0.19"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+
+# Keep the sidecar binary small: default release settings leave megabytes of symbols
+# and unoptimized generic code behind. panic stays "unwind" so panics surface as errors.
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
