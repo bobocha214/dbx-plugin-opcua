@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.yuzhi.opcua",
+  "publisher": "yuzhi",
+  "version": "0.1.0",
+  "name": "OPC UA",
+  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values with data type aware decoding.",
+  "icon": "https://raw.githubusercontent.com/yuzhi/dbx-plugin-opcua/v0.1.0/assets/plugin.svg",
+  "tags": [
+    "opcua",
+    "opc-ua",
+    "plc",
+    "industrial",
+    "iot",
+    "scada"
+  ],
+  "permissions": [
+    "host.connections:read",
+    "host.workbench"
+  ],
+  "source": "https://github.com/yuzhi/dbx-plugin-opcua/tree/v0.1.0",
+  "homepage": "https://github.com/yuzhi/dbx-plugin-opcua",
+  "license": "Apache-2.0",
+  "releaseNotes": "Initial release: OPC UA connection provider, address space browser, typed node reads and guarded writes.",
+  "localizations": {
+    "zh-CN": {
+      "name": "OPC UA",
+      "description": "浏览 PLC 和 OPC UA 服务器的地址空间，按数据类型读取并写入节点值。"
+    }
+  },
+  "targets": [
+    {
+      "target": "windows-x64",
+      "url": "https://github.com/yuzhi/dbx-plugin-opcua/releases/download/v0.1.0/io.github.yuzhi.opcua-0.1.0-windows-x64.dbxp",
+      "sha256": "ac27d60f6153e57de6b3950a74a80377e6aaf5a78e654f718e1734eb4ae172f7",
+      "size": 2647320
+    }
+  ]
+}

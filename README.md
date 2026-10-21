@@ -17,7 +17,10 @@ dbx-plugin-opcua/
 ├── assets/                    # plugin.svg、connection.svg
 ├── ui/                        # 沙箱工作台（index.html、styles.css、app.js、icon.svg）
 ├── backend/                   # Rust sidecar（Cargo.toml、src/main.rs）
+├── scripts/                   # build-store-candidate.mjs（生成商店候选元数据）
+├── store/                     # 上架 DBX Store 用的材料（publisher 记录、候选元数据、PR 正文）
 ├── .github/workflows/         # plugin-release.yml（上游 reusable workflow，产出多平台包）
+├── LICENSE                    # Apache-2.0
 └── dist/                      # 打包输出（不提交 Git）
 ```
 
@@ -54,8 +57,11 @@ dist/io.github.yuzhi.opcua-0.1.0-<target>.artifact.json
 |------|--------|
 | Windows x64 | `windows-x64` |
 | Linux x64 | `linux-x64` |
+| Linux ARM64 | `linux-arm64` |
 | macOS Intel | `darwin-x64` |
 | macOS Apple Silicon | `darwin-arm64` |
+
+（上表即上游 reusable workflow 的默认 `build-matrix`；本仓库未覆盖它。）
 
 Release 需包含：每个平台的 `.dbxp` + 对应 `.artifact.json` + 汇总的 `release-candidates.json` + Release Notes 与源码 Tag。**不要把 `.dbxp` 提交进 Git 历史。**
 
@@ -66,6 +72,56 @@ dbx-plugin package . --target windows-x64
 ```
 
 > 离线环境：若无法访问 crates.io，可加 `CARGO_NET_OFFLINE=true`（依赖需已缓存）。
+
+## 上架官方商店（DBX Store）
+
+官方目录仓库：[t8y2/dbx-store](https://github.com/t8y2/dbx-store)（规范见其 `README.zh-CN.md` 与 `CONTRIBUTING.md`）。插件源码与未签名候选 Release **留在本仓库**，商店只收目录元数据，`.dbxp` 二进制不能提交进 Git。
+
+### 1. 发布未签名候选包
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+在 GitHub 上发布该 Tag 的 Release，`plugin-release.yml` 会自动为 5 个平台各构建一个 `.dbxp`，并把包与汇总的 `release-candidates.json` 上传到该 Release。
+
+### 2. 生成候选元数据
+
+```bash
+# 仅本地已构建的平台（默认读取 dist/*.artifact.json）
+node scripts/build-store-candidate.mjs --repo yuzhi/dbx-plugin-opcua --tag v0.1.0
+
+# Release 已发布、拿到全部平台后（下载 Release 里的 release-candidates.json）
+node scripts/build-store-candidate.mjs --repo yuzhi/dbx-plugin-opcua --tag v0.1.0 \
+  --release-candidates ./release-candidates.json
+```
+
+脚本从**真实构建产物**读取 SHA-256 与大小写入 `store/candidates/io.github.yuzhi.opcua.json`，不要手抄这两个值——签名工作流会逐字节比对，不一致直接拒绝。重新打包后哈希会变，必须重新生成。
+
+> 汇总文件不会自动识别：只有显式传 `--release-candidates` 才会使用。因为一份与实际上传字节不符的陈旧清单会 pin 错哈希。
+
+商店展示文案（name / description / tags / license / localizations / releaseNotes）取自 `.dbx-store.json`——这也是商店同步器读取的同一份元数据。要改文案就改那里再重跑脚本，不要直接手改 `store/candidates/*.json`（下次生成会被覆盖）。
+
+> `store/make-candidate.mjs` 是功能等价的早期脚本，但它**必须**传 `--release-candidates`（只适用于 Release 已发布之后）。本地打包完就想生成候选时用 `scripts/` 下这个。
+
+### 3. 提交 catalog PR
+
+fork `t8y2/dbx-store`，在 PR 中加入两个文件（**只加这两个**）：
+
+| 本仓库文件 | 放到 dbx-store 的 |
+|---|---|
+| `store/publishers/yuzhi.json` | `publishers/yuzhi.json` |
+| `store/candidates/io.github.yuzhi.opcua.json` | `candidates/io.github.yuzhi.opcua.json` |
+
+PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data access、network access、native sidecar behavior）。
+
+- CI 在签名完成前**保持红色**（`open candidate(s) awaiting DBX Store signing`），这是设计如此，不要去修。
+- 维护者会在 PR 下评论 `/sign` 触发受保护签名工作流，它把最终 `plugins/<id>.json` 与 `catalog/index.json` 写回同一个 PR，然后由维护者合并。
+- 不得提交：`.dbxp` 二进制、插件源码、私钥/Token；不得自填 `verified: true`；候选 URL 不能引用 `dbx-store` 自己的 Release。
+
+### 当前状态
+
+本机只能构建 `windows-x64`（无 Linux/macOS linker，也无法交叉编译），因此仓库里的候选元数据目前**只含 windows-x64**。其余 4 个平台请在 Release 构建完成后，用 `--release-candidates` 重新生成，覆盖 `targets` 后再提交/更新 PR。
 
 ## 使用
 
@@ -114,7 +170,8 @@ dbx-plugin package . --target windows-x64
 
 ## 待替换 / 已知限制
 
-- `manifest.json` 中 `source` / `homepage` 为占位值，发布前请替换为你的仓库地址。
+- `manifest.json` 的 `source` / `homepage` 指向 `https://github.com/yuzhi/dbx-plugin-opcua`；若仓库地址不同请一并修改（改 manifest 会改变包内容，需重新打包并重新生成候选元数据）。
+- 许可证：仓库 `LICENSE` 与 `backend/Cargo.toml` 均为 **Apache-2.0**，商店条目的 `license` 字段保持一致。
 - 仅 `None` 安全策略；写入仅支持标量类型；未实现订阅与方法调用。
 - 本插件自行实现 JSON-RPC（未使用官方 `dbx-plugin-sdk`），因为 `async-opcua` 需要常驻 tokio runtime 驱动会话事件循环，而 SDK 的 handler 是同步的。协议行为已按 SDK 源码对齐。
 

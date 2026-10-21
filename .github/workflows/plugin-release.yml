@@ -11,17 +11,19 @@ permissions:
 
 jobs:
   release:
-    # Pinned to `main`. The ref emitted by `dbx-plugin create`, `plugin-sdk-v1`,
-    # does not exist upstream (neither a tag nor a branch), so the run failed
-    # before any platform was built. Pin to a tag or commit SHA if you prefer an
-    # immutable ref.
-    uses: t8y2/dbx/.github/workflows/plugin-release-reusable.yml@main
+    # Pinned to a commit SHA, not a branch: reusable workflows run with the
+    # caller's permissions, so a moving ref is a supply-chain risk. Note that
+    # `plugin-sdk-v1` (the ref `dbx-plugin create` emits) does NOT exist upstream
+    # -- neither a tag nor a branch -- and the run fails before building anything.
+    # To upgrade: take the new SHA of t8y2/dbx main and re-run one release.
+    uses: t8y2/dbx/.github/workflows/plugin-release-reusable.yml@d030f4276f7922fbc2b0b844a20875991347ac79 # main @ 2026-10-21
     with:
       release-tag: ${{ github.event.release.tag_name }}
       package-command: dbx-plugin package .
       package-path: dist/*.dbxp
       metadata-path: dist/*.artifact.json
-      plugin-cli-version: 0.1.6
+      # Pinned to the version this repository was actually packaged and verified with.
+      plugin-cli-version: 0.1.9
       rust-toolchain: stable
       # No Go backend, so skip actions/setup-go entirely.
       go-version: ""
