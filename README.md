@@ -20,7 +20,7 @@ dbx-plugin-opcua/
 ├── scripts/                   # build-store-candidate.mjs（生成商店候选元数据）
 ├── store/                     # 上架 DBX Store 用的材料（publisher 记录、候选元数据、PR 正文）
 ├── .github/workflows/         # plugin-release.yml（上游 reusable workflow，产出多平台包）
-├── LICENSE                    # Apache-2.0
+├── LICENSE                    # MIT
 └── dist/                      # 打包输出（不提交 Git）
 ```
 
@@ -171,7 +171,7 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 ## 待替换 / 已知限制
 
 - `manifest.json` 的 `source` / `homepage` 指向 `https://github.com/yuzhi/dbx-plugin-opcua`；若仓库地址不同请一并修改（改 manifest 会改变包内容，需重新打包并重新生成候选元数据）。
-- 许可证：仓库 `LICENSE` 与 `backend/Cargo.toml` 均为 **Apache-2.0**，商店条目的 `license` 字段保持一致。
+- 许可证：仓库 `LICENSE` 与 `backend/Cargo.toml` 均为 **MIT**，商店条目的 `license` 字段保持一致。
 - 仅 `None` 安全策略；写入仅支持标量类型；未实现订阅与方法调用。
 - 本插件自行实现 JSON-RPC（未使用官方 `dbx-plugin-sdk`），因为 `async-opcua` 需要常驻 tokio runtime 驱动会话事件循环，而 SDK 的 handler 是同步的。协议行为已按 SDK 源码对齐。
 

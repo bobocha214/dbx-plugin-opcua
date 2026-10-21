@@ -100,8 +100,8 @@ for (const key of Object.keys(meta)) {
 const defaults = {
   tags: ["opcua", "industrial", "plc", "iiot", "automation"],
   icon: `https://raw.githubusercontent.com/${repo}/${tag}/assets/plugin.svg`,
-  // Must match the repository LICENSE and backend/Cargo.toml (both Apache-2.0).
-  license: "Apache-2.0",
+  // Must match the repository LICENSE and backend/Cargo.toml (both MIT).
+  license: "MIT",
   releaseNotes: "Initial release: connect to an OPC UA server, browse the address space, read node values, and write scalar values.",
   localizations: {
     "zh-CN": {

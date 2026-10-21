@@ -16,7 +16,7 @@
 | Plugin ID | `io.github.yuzhi.opcua` |
 | Version | `0.1.0` |
 | Publisher | `yuzhi` |
-| License | Apache-2.0 (see `LICENSE`; matches `backend/Cargo.toml`) |
+| License | MIT (see `LICENSE`; matches `backend/Cargo.toml`) |
 | Source | https://github.com/yuzhi/dbx-plugin-opcua/tree/v0.1.0 |
 | Release | https://github.com/yuzhi/dbx-plugin-opcua/releases/tag/v0.1.0 |
 

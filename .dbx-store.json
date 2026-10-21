@@ -16,7 +16,7 @@
   ],
   "source": "https://github.com/yuzhi/dbx-plugin-opcua",
   "homepage": "https://github.com/yuzhi/dbx-plugin-opcua",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "releaseNotes": "Initial release: OPC UA connection provider, address space browser, typed node reads and guarded writes.",
   "localizations": {
     "zh-CN": {
