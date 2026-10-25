@@ -6,7 +6,7 @@
 // mismatch, so these values must come from the real build output, never by hand.
 //
 // Usage:
-//   node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag v0.1.0
+//   node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag v0.2.0
 //
 // Artifact sources:
 //   dist/*.artifact.json          default; one entry per locally built package

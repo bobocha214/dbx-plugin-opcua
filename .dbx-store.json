@@ -17,7 +17,7 @@
   "source": "https://github.com/bobocha214/dbx-plugin-opcua",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "license": "MIT",
-  "releaseNotes": "Initial release: OPC UA connection provider, address space browser, typed node reads and guarded writes.",
+  "releaseNotes": "0.2.0: new plugin and connection icons; three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes resolve the node DataType server-side, report the OPC UA status code on failure and read the value back.",
   "localizations": {
     "zh-CN": {
       "name": "OPC UA",

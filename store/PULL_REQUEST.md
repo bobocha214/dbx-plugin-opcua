@@ -14,11 +14,11 @@
 | | |
 |---|---|
 | Plugin ID | `io.github.bobocha214.opcua` |
-| Version | `0.1.0` |
+| Version | `0.2.0` |
 | Publisher | `bobocha214` |
 | License | MIT (see `LICENSE`; matches `backend/Cargo.toml`) |
-| Source | https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.1.0 |
-| Release | https://github.com/bobocha214/dbx-plugin-opcua/releases/tag/v0.1.0 |
+| Source | https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.0 |
+| Release | https://github.com/bobocha214/dbx-plugin-opcua/releases/tag/v0.2.0 |
 
 ### Capabilities
 
@@ -26,6 +26,8 @@
 - `workbench` — **OPC UA Browser**, a three-column layout: the address space tree on the left (`Objects` / `Views` / `Types`), a drop board in the middle, the selected point's details on the right. Points are added by **dragging a `Variable` node** from the tree onto the board (non-`Variable` nodes are rejected with a hint); the board polls the selected points and a value can be edited in place to write it back immediately. The two column dividers are draggable (double-click resets, widths are remembered). Selecting a node or a board card shows its NodeId / BrowseName / DisplayName / NodeClass plus current value and write form. Writes resolve the node's `DataType` attribute server-side, surface the OPC UA status code on failure and read the value back to confirm it actually changed.
 
 Implemented sidecar methods: `plugin/initialize`, `connection/test`, `connection/connect`, `connection/disconnect`, `opcua/root`, `opcua/browse`, `opcua/read`, `opcua/readMany`, `opcua/write`.
+
+Branding assets: `assets/plugin.svg`, `assets/connection.svg` and `ui/icon.svg` are self-contained 64×64 vector files — no external references, no raster data, no `<script>`, no embedded fonts.
 
 Not implemented: method calls (`Call`), subscriptions/monitored items, historical reads, `Sign` / `SignAndEncrypt` security policies (only `None`).
 
@@ -58,6 +60,6 @@ Not requested: `host.storage` (the watch list uses the page's own `localStorage`
 
 ### Review aids
 
-- Source: https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.1.0
-- Unsigned candidates and `release-candidates.json` are attached to release `v0.1.0`; the SHA-256 and size in `candidates/io.github.bobocha214.opcua.json` pin those exact bytes.
+- Source: https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.0
+- Unsigned candidates and `release-candidates.json` are attached to release `v0.2.0`; the SHA-256 and size in `candidates/io.github.bobocha214.opcua.json` pin those exact bytes.
 - `verified` is left to maintainers; this submission does not set it.

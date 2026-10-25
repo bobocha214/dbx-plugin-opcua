@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.bobocha214.opcua",
   "publisher": "bobocha214",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "OPC UA",
   "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values with data type aware decoding.",
-  "icon": "https://raw.githubusercontent.com/bobocha214/dbx-plugin-opcua/v0.1.0/assets/plugin.svg",
+  "icon": "https://raw.githubusercontent.com/bobocha214/dbx-plugin-opcua/v0.2.0/assets/plugin.svg",
   "tags": [
     "opcua",
     "opc-ua",
@@ -18,10 +18,10 @@
     "host.connections:read",
     "host.workbench"
   ],
-  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.1.0",
+  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.0",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "license": "MIT",
-  "releaseNotes": "Initial release: OPC UA connection provider, address space browser, typed node reads and guarded writes.",
+  "releaseNotes": "0.2.0: new plugin and connection icons; three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes resolve the node DataType server-side, report the OPC UA status code on failure and read the value back.",
   "localizations": {
     "zh-CN": {
       "name": "OPC UA",
@@ -31,9 +31,9 @@
   "targets": [
     {
       "target": "windows-x64",
-      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.1.0/io.github.bobocha214.opcua-0.1.0-windows-x64.dbxp",
-      "sha256": "ae54113acc6e74a3309c1c3d62d71aa0ccdf3ef00dbfabc6c51f5e7556590261",
-      "size": 2666415
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.0/io.github.bobocha214.opcua-0.2.0-windows-x64.dbxp",
+      "sha256": "75a52cff226006bfde37886d563ce5f65628644953f4681a25e874d0faf2eacd",
+      "size": 2666805
     }
   ]
 }

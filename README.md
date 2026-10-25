@@ -24,6 +24,17 @@ dbx-plugin-opcua/
 └── dist/                      # 打包输出（不提交 Git）
 ```
 
+### 图标
+
+三个 SVG（`assets/plugin.svg`、`assets/connection.svg`、`ui/icon.svg`）遵循同一套规范，保证在宿主侧栏 16–24px 和商店大图 96px 下都清晰：
+
+- `viewBox="0 0 64 64"`，背景**满幅** `rect 0 0 64 64`（不内缩），圆角 `rx="16"`；
+- 背景用垂直 `linearGradient`（`#4F8EF7 → #1E3A8A`）而不是平涂色，与同发布者的 Modbus 插件（`#60A5FA → #0D9488`）属于同一视觉家族；
+- 根节点**不写死 `width`/`height`**，由宿主按容器尺寸缩放，避免在 20–24px 芯片里被裁切或出现留白；
+- 线条粗细按 64 画布给到 `5`（小尺寸下不糊），图形元素控制在 3 个以内。
+
+`ui/icon.svg` 与 `assets/plugin.svg` 内容保持一致（工作台标题栏与插件列表使用同一图形）。
+
 ## 打包
 
 使用官方 CLI（Node 包，内含预编译二进制）：
@@ -37,8 +48,8 @@ dbx-plugin package . --target windows-x64 --output-dir dist
 产物（未签名审核候选包）：
 
 ```
-dist/io.github.bobocha214.opcua-0.1.0-<target>.dbxp
-dist/io.github.bobocha214.opcua-0.1.0-<target>.artifact.json
+dist/io.github.bobocha214.opcua-0.2.0-<target>.dbxp
+dist/io.github.bobocha214.opcua-0.2.0-<target>.artifact.json
 ```
 
 本地安装测试：在 DBX 插件中心开启「允许安装未签名开发包」后安装该 `.dbxp`。
@@ -80,7 +91,7 @@ dbx-plugin package . --target windows-x64
 ### 1. 发布未签名候选包
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
 在 GitHub 上发布该 Tag 的 Release，`plugin-release.yml` 会自动为 5 个平台各构建一个 `.dbxp`，并把包与汇总的 `release-candidates.json` 上传到该 Release。
@@ -89,10 +100,10 @@ git tag v0.1.0 && git push origin v0.1.0
 
 ```bash
 # 仅本地已构建的平台（默认读取 dist/*.artifact.json）
-node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag v0.1.0
+node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag v0.2.0
 
 # Release 已发布、拿到全部平台后（下载 Release 里的 release-candidates.json）
-node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag v0.1.0 \
+node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag v0.2.0 \
   --release-candidates ./release-candidates.json
 ```
 
@@ -203,7 +214,7 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 {
   "protocolVersion": 1,
   "capabilities": ["connections"],
-  "plugin": { "id": "io.github.bobocha214.opcua", "version": "0.1.0" }
+  "plugin": { "id": "io.github.bobocha214.opcua", "version": "0.2.0" }
 }
 ```
 

@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "id": "io.github.bobocha214.opcua",
   "name": "OPC UA",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "bobocha214",
   "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values.",
   "source": "https://github.com/bobocha214/dbx-plugin-opcua",
