@@ -97,9 +97,52 @@ async fn open_session(conn: &ConnectionFields) -> Result<(Arc<Session>, tokio::t
         .await
         .map_err(|e| format!("Cannot connect to {}: {}", url, e))?;
 
-    // SessionEventLoop::spawn() launches the loop onto the tokio runtime and returns a handle.
+    // `connect_to_matching_endpoint` only *prepares* the session — the actual secure-channel /
+    // CreateSession handshake runs inside the event loop, which is spawned just below. Waiting
+    // here is what makes `connection/connect` an honest success signal: without it the first
+    // read/write issued right after connecting races the transport and fails with
+    // BadNotConnected ("Unable to send request, transport is not connected").
     let handle = event_loop.spawn();
-    Ok((session, handle))
+    match tokio::time::timeout(HANDSHAKE_TIMEOUT, session.wait_for_connection()).await {
+        Ok(true) => Ok((session, handle)),
+        Ok(false) => {
+            handle.abort();
+            Err(format!("Cannot connect to {}: session closed during the handshake", url))
+        }
+        Err(_) => {
+            handle.abort();
+            Err(format!(
+                "Cannot connect to {}: the OPC UA handshake did not finish within {}s",
+                url,
+                HANDSHAKE_TIMEOUT.as_secs()
+            ))
+        }
+    }
+}
+
+/// How long a connection may take to complete its handshake.
+const HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Fetch the session for a connection and make sure its transport is usable.
+///
+/// Reconnecting is asynchronous, so a request that arrives while the session is being
+/// re-established would otherwise fail with a bare BadNotConnected.
+async fn ready_session(conn_id: &str, sessions: &Sessions) -> Result<Arc<Session>, String> {
+    let session = clone_session(conn_id, sessions)?;
+    // Returns immediately when the session is already connected (watch channel semantics).
+    match tokio::time::timeout(HANDSHAKE_TIMEOUT, session.wait_for_connection()).await {
+        Ok(true) => Ok(session),
+        Ok(false) => Err(format!(
+            "Connection '{}' was closed. Open it in DBX again, then retry.",
+            conn_id
+        )),
+        Err(_) => Err(format!(
+            "Connection '{}' is not ready: the session did not reconnect within {}s. \
+             If the network dropped, reopen the connection in DBX.",
+            conn_id,
+            HANDSHAKE_TIMEOUT.as_secs()
+        )),
+    }
 }
 
 /// Extract a connection id from the generic request params.
@@ -166,23 +209,187 @@ fn variant_to_json(v: &Variant) -> (String, Value) {
     }
 }
 
+/// Data types this sidecar can build a Variant for. Everything else (DateTime, Guid,
+/// ExtensionObject, arrays, ...) is rejected with an explicit message instead of being
+/// silently coerced into something the server will reject with BadTypeMismatch.
+const WRITABLE_TYPES: [&str; 12] = [
+    "Boolean", "SByte", "Byte", "Int16", "UInt16", "Int32", "UInt32", "Int64", "UInt64", "Float",
+    "Double", "String",
+];
+
+/// Map a namespace-0 type NodeId (`i=1`..`i=25`) to its type name.
+fn builtin_type_name(node_id: &NodeId) -> Option<&'static str> {
+    if node_id.namespace != 0 {
+        return None;
+    }
+    let id = match &node_id.identifier {
+        Identifier::Numeric(id) => *id,
+        _ => return None,
+    };
+    Some(match id {
+        1 => "Boolean",
+        2 => "SByte",
+        3 => "Byte",
+        4 => "Int16",
+        5 => "UInt16",
+        6 => "Int32",
+        7 => "UInt32",
+        8 => "Int64",
+        9 => "UInt64",
+        10 => "Float",
+        11 => "Double",
+        12 => "String",
+        13 => "DateTime",
+        14 => "Guid",
+        15 => "ByteString",
+        16 => "XmlElement",
+        17 => "NodeId",
+        18 => "ExpandedNodeId",
+        19 => "StatusCode",
+        20 => "QualifiedName",
+        21 => "LocalizedText",
+        22 => "ExtensionObject",
+        23 => "DataValue",
+        24 => "Variant",
+        25 => "DiagnosticInfo",
+        _ => return None,
+    })
+}
+
+/// What the server says about a node, read in one round trip before writing.
+///
+/// Without this the client has to guess the type, and a wrong guess is reported by the
+/// server as a bare `BadTypeMismatch` that is indistinguishable from a broken write.
+struct NodeWriteInfo {
+    /// Concrete builtin type reported by the server; `None` for abstract (BaseDataType,
+    /// Number, ...) or custom structure types.
+    server_type: Option<String>,
+    /// -1 = scalar, -3 = scalar or 1-dim, 0 = 1-dim array, >0 = n-dim array.
+    value_rank: i32,
+    /// Bit 1 (0x02) means CurrentWrite is allowed.
+    user_access_level: Option<u8>,
+    data_type_id: Option<String>,
+}
+
+const VALUE_RANK_UNKNOWN: i32 = -2;
+
+async fn probe_node(session: &Session, node_id: &NodeId) -> NodeWriteInfo {
+    let attr = |a: AttributeId| ReadValueId {
+        node_id: node_id.clone(),
+        attribute_id: a as u32,
+        index_range: NumericRange::None,
+        data_encoding: QualifiedName::null(),
+    };
+    let reads = vec![
+        attr(AttributeId::DataType),
+        attr(AttributeId::ValueRank),
+        attr(AttributeId::UserAccessLevel),
+    ];
+
+    let mut info = NodeWriteInfo {
+        server_type: None,
+        value_rank: VALUE_RANK_UNKNOWN,
+        user_access_level: None,
+        data_type_id: None,
+    };
+
+    // A failed probe is not fatal: the caller may still pass an explicit type.
+    let values = match session.read(&reads, TimestampsToReturn::Neither, 0.0).await {
+        Ok(v) => v,
+        Err(_) => return info,
+    };
+
+    if let Some(Some(Variant::NodeId(nid))) = values.first().map(|v| v.value.clone()) {
+        info.data_type_id = Some(nid.to_string());
+        info.server_type = builtin_type_name(&nid).map(str::to_string);
+    }
+    if let Some(Some(Variant::Int32(rank))) = values.get(1).map(|v| v.value.clone()) {
+        info.value_rank = rank;
+    }
+    if let Some(Some(Variant::Byte(level))) = values.get(2).map(|v| v.value.clone()) {
+        info.user_access_level = Some(level);
+    }
+
+    info
+}
+
+/// Strip separators a human might type and normalise a single decimal comma (`1,5`).
+fn normalize_number(raw: &str) -> String {
+    let s: String = raw.chars().filter(|c| !c.is_whitespace()).collect();
+    if s.matches(',').count() == 1 && !s.contains('.') {
+        s.replace(',', ".")
+    } else {
+        s
+    }
+}
+
+fn num_err(raw: &str, data_type: &str, e: &dyn std::fmt::Display) -> String {
+    let detail = e.to_string();
+    let reason = if detail.contains("too large") {
+        "超出该类型的最大可表示值".to_string()
+    } else if detail.contains("too small") || detail.contains("negative") {
+        "超出该类型的最小可表示值".to_string()
+    } else if detail.contains("invalid digit") || detail.contains("float literal") {
+        "包含无法解析的字符".to_string()
+    } else {
+        detail
+    };
+    format!("值 '{}' 不是合法的 {}（{}）", raw, data_type, reason)
+}
+
+fn parse_num<T>(raw: &str, data_type: &str) -> Result<T, String>
+where
+    T: FromStr,
+    T::Err: std::fmt::Display,
+{
+    normalize_number(raw)
+        .parse::<T>()
+        .map_err(|e| num_err(raw, data_type, &e))
+}
+
 /// Parse a scalar value string into a Variant for writing.
-fn parse_variant(data_type: &str, value: &str) -> Result<Variant, String> {
-    let bad = |e: &dyn std::fmt::Display| format!("Invalid {} value '{}': {}", data_type, value, e);
+fn parse_variant(data_type: &str, raw: &str) -> Result<Variant, String> {
+    let value = raw.trim();
     match data_type {
-        "Boolean" => value.parse::<bool>().map(Variant::Boolean).map_err(|e| bad(&e)),
-        "SByte" => value.parse::<i8>().map(Variant::SByte).map_err(|e| bad(&e)),
-        "Byte" => value.parse::<u8>().map(Variant::Byte).map_err(|e| bad(&e)),
-        "Int16" => value.parse::<i16>().map(Variant::Int16).map_err(|e| bad(&e)),
-        "UInt16" => value.parse::<u16>().map(Variant::UInt16).map_err(|e| bad(&e)),
-        "Int32" => value.parse::<i32>().map(Variant::Int32).map_err(|e| bad(&e)),
-        "UInt32" => value.parse::<u32>().map(Variant::UInt32).map_err(|e| bad(&e)),
-        "Int64" => value.parse::<i64>().map(Variant::Int64).map_err(|e| bad(&e)),
-        "UInt64" => value.parse::<u64>().map(Variant::UInt64).map_err(|e| bad(&e)),
-        "Float" => value.parse::<f32>().map(Variant::Float).map_err(|e| bad(&e)),
-        "Double" => value.parse::<f64>().map(Variant::Double).map_err(|e| bad(&e)),
-        "String" => Ok(Variant::String(UAString::from(value.to_string()))),
-        other => Err(format!("Unsupported data type for write: {}", other)),
+        "Boolean" => match value.to_ascii_lowercase().as_str() {
+            "true" | "t" | "yes" | "y" | "on" | "1" => Ok(Variant::Boolean(true)),
+            "false" | "f" | "no" | "n" | "off" | "0" => Ok(Variant::Boolean(false)),
+            _ => Err(format!(
+                "值 '{}' 不是合法的 Boolean（可用 true/false、1/0、yes/no、on/off）",
+                raw
+            )),
+        },
+        "SByte" => parse_num::<i8>(value, data_type).map(Variant::SByte),
+        "Byte" => parse_num::<u8>(value, data_type).map(Variant::Byte),
+        "Int16" => parse_num::<i16>(value, data_type).map(Variant::Int16),
+        "UInt16" => parse_num::<u16>(value, data_type).map(Variant::UInt16),
+        "Int32" => parse_num::<i32>(value, data_type).map(Variant::Int32),
+        "UInt32" => parse_num::<u32>(value, data_type).map(Variant::UInt32),
+        "Int64" => parse_num::<i64>(value, data_type).map(Variant::Int64),
+        "UInt64" => parse_num::<u64>(value, data_type).map(Variant::UInt64),
+        "Float" => parse_num::<f32>(value, data_type).map(Variant::Float),
+        "Double" => parse_num::<f64>(value, data_type).map(Variant::Double),
+        "String" => Ok(Variant::String(UAString::from(raw.to_string()))),
+        other => Err(format!(
+            "暂不支持写入 {} 类型（支持 {}）",
+            other,
+            WRITABLE_TYPES.join("/")
+        )),
+    }
+}
+
+/// Readable explanation for a failed Write service result.
+fn write_status_hint(code: &StatusCode, data_type: &str) -> String {
+    match code.sub_code().name() {
+        "BadTypeMismatch" => format!("值类型与节点要求的 {} 不匹配", data_type),
+        "BadNotWritable" => "该节点不可写（服务器报告 NotWritable，常见于只读点位或 PLC 侧未开放写权限）".into(),
+        "BadUserAccessDenied" => "权限不足：当前用户或安全策略不允许写入该节点".into(),
+        "BadNodeIdUnknown" => "节点在该服务器的地址空间中不存在".into(),
+        "BadOutOfRange" => "写入值超出节点允许的范围".into(),
+        "BadWriteNotSupported" => "该节点不支持写入".into(),
+        "BadNotConnected" => "会话已断开，请在 DBX 中重新打开连接".into(),
+        "BadTooManyOperations" => "服务器拒绝了本次写入请求".into(),
+        _ => format!("服务器返回 {}", code.sub_code().name()),
     }
 }
 
@@ -309,7 +516,7 @@ async fn handle_browse(params: &Value, sessions: &Sessions) -> Result<Value, Str
         .get("nodeId")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Missing nodeId".to_string())?;
-    let session = clone_session(&conn_id, sessions)?;
+    let session = ready_session(&conn_id, sessions).await?;
     let node_id =
         NodeId::from_str(node_id_str).map_err(|e| format!("Invalid nodeId '{}': {}", node_id_str, e))?;
 
@@ -377,7 +584,7 @@ async fn handle_read(params: &Value, sessions: &Sessions) -> Result<Value, Strin
         .get("nodeId")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Missing nodeId".to_string())?;
-    let session = clone_session(&conn_id, sessions)?;
+    let session = ready_session(&conn_id, sessions).await?;
     let node_id =
         NodeId::from_str(node_id_str).map_err(|e| format!("Invalid nodeId '{}': {}", node_id_str, e))?;
 
@@ -443,7 +650,7 @@ async fn handle_read_many(params: &Value, sessions: &Sessions) -> Result<Value, 
         ));
     }
 
-    let session = clone_session(&conn_id, sessions)?;
+    let session = ready_session(&conn_id, sessions).await?;
 
     let mut parsed: Vec<(String, NodeId)> = Vec::with_capacity(ids.len());
     for s in ids {
@@ -478,25 +685,69 @@ async fn handle_read_many(params: &Value, sessions: &Sessions) -> Result<Value, 
     Ok(json!({ "values": out }))
 }
 
+/// `value` may arrive as a JSON string (the UI always sends one) or as a raw number /
+/// boolean, so this method stays usable from scripts and other clients.
+fn scalar_to_string(v: Option<&Value>) -> Option<String> {
+    match v {
+        Some(Value::String(s)) => Some(s.clone()),
+        Some(Value::Number(n)) => Some(n.to_string()),
+        Some(Value::Bool(b)) => Some(b.to_string()),
+        _ => None,
+    }
+}
+
 async fn handle_write(params: &Value, sessions: &Sessions) -> Result<Value, String> {
     let conn_id = extract_conn_id(params).ok_or_else(|| "Missing connection id".to_string())?;
     let node_id_str = params
         .get("nodeId")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Missing nodeId".to_string())?;
-    let data_type = params
+    let value = scalar_to_string(params.get("value"))
+        .ok_or_else(|| "Missing value (expected a string, number or boolean)".to_string())?;
+    let requested = params
         .get("dataType")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| "Missing dataType".to_string())?;
-    let value = params
-        .get("value")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| "Missing value".to_string())?;
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("Auto")
+        .to_string();
 
-    let session = clone_session(&conn_id, sessions)?;
+    let session = ready_session(&conn_id, sessions).await?;
     let node_id =
         NodeId::from_str(node_id_str).map_err(|e| format!("Invalid nodeId '{}': {}", node_id_str, e))?;
-    let variant = parse_variant(data_type, value)?;
+
+    // Ask the server what this node actually is before guessing a type.
+    let info = probe_node(&session, &node_id).await;
+
+    // Arrays and matrices need an array Variant; fail with the real reason instead of a
+    // generic BadTypeMismatch.
+    if info.value_rank == 0 || info.value_rank > 0 {
+        return Err(format!(
+            "节点 {} 是数组（ValueRank={}），当前只支持写入标量值",
+            node_id_str, info.value_rank
+        ));
+    }
+
+    // The server-reported type wins: writing an incompatible Variant is always rejected,
+    // so a stale hand-picked type from the UI must not override it.
+    let (data_type, type_source) = match &info.server_type {
+        Some(t) => (t.clone(), "server"),
+        None => {
+            if requested.eq_ignore_ascii_case("Auto") {
+                let what = match &info.data_type_id {
+                    Some(id) => format!("DataType 为 {}（抽象类型或自定义结构）", id),
+                    None => "DataType 属性读取失败".to_string(),
+                };
+                return Err(format!(
+                    "无法自动推断写入类型：节点 {} 的 {}。请在右侧手动选择数据类型后再写入。",
+                    node_id_str, what
+                ));
+            }
+            (requested.clone(), "request")
+        }
+    };
+
+    let variant = parse_variant(&data_type, &value)?;
 
     let wv = WriteValue {
         node_id,
@@ -508,13 +759,26 @@ async fn handle_write(params: &Value, sessions: &Sessions) -> Result<Value, Stri
         .write(&[wv])
         .await
         .map_err(|e| format!("Write failed: {}", e))?;
-    let status = statuses
+    let code = statuses
         .into_iter()
         .next()
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "Unknown".to_string());
+        .unwrap_or(StatusCode::BadNothingToDo);
+    let success = code.is_good();
 
-    Ok(json!({ "nodeId": node_id_str, "status": status }))
+    // A good status code is still returned as `success: false` when the server says Bad —
+    // the UI must never render a rejected write as a success.
+    Ok(json!({
+        "nodeId": node_id_str,
+        "success": success,
+        "status": code.to_string(),
+        "statusCode": code.bits(),
+        "message": if success { Value::Null } else { Value::String(write_status_hint(&code, &data_type)) },
+        "dataType": data_type,
+        "dataTypeSource": type_source,
+        "requestedDataType": requested,
+        "valueRank": info.value_rank,
+        "userAccessLevel": info.user_access_level,
+    }))
 }
 
 // ---------------------------------------------------------------------------

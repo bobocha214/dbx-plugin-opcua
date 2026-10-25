@@ -143,12 +143,14 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 - **中**：点位区。把左侧树上的 `Variable` 点位**拖动**到这里即加入；拖入 `Object` / `Method` 等非 `Variable` 节点会被拒绝并提示原因。
 - **右**：选中点位的详细信息（NodeId / BrowseName / DisplayName / NodeClass）、当前值（可「读取」）、写入表单，以及加入/移出点位区。
 - 点击左侧树节点或中间点位卡片都能选中该点位，树行与卡片高亮联动，右侧详情随之切换。左侧树没有展开过的点位（例如从 `localStorage` 恢复的）同样可以查看详情。
+- **分栏宽度可拖动**：两条分隔条用鼠标拖动即可调整左/中/右三栏宽度（键盘聚焦后 `←` `→` 微调，`Shift` 加速），双击分隔条恢复默认 236 / 302，宽度按面板记在 `localStorage`；面板变窄时中间点位区保底 200px。
+- 把点位拖到**右侧详情区**也能直接查看该点位详情。
 
 ### 点位区（持续观察 + 就地改写下发）
 - 添加：从左侧树拖入；或树上 `Variable` 行悬停出现「＋」；或右侧详情点「加入点位区」。只有 `Variable` 可加入。
 - 观察：点「▶ 持续观察」，按 200ms / 500ms / 1s / 2s / 5s 间隔轮询；走 **`opcua/readMany` 一次批量读**，N 个点只花一次往返。上一轮未返回时自动跳过本轮，避免堆积。
-- 改值下发：**鼠标点击数值** → 变成已全选的输入框 → 改完回车（或失焦）即 `opcua/write` 下发；`Esc` 取消。写入成功后自动回读该点，单元格绿色闪烁，失败红色闪烁并提示。
-- 轮询期间**不会覆盖你正在编辑的单元格**；写入用的数据类型取该点最近一次读到的 `dataType`。
+- 改值下发：**鼠标点击数值** → 变成已全选的输入框 → 改完回车（或失焦）即 `opcua/write` 下发；`Esc` 取消。写入成功后自动回读该点，单元格绿色闪烁；失败红色闪烁并提示服务器返回的状态码与原因。
+- 轮询期间**不会覆盖你正在编辑的单元格**；写入的数据类型由 sidecar 读取该节点的 `DataType` 属性决定（见下节），不依赖本地猜测。
 - 点位区按连接 id 存 `localStorage`，切换连接后自动恢复；`×` 移除，「清空」全清。
 - 轮询失败会停止观察并提示（常见原因是会话未建立，需先在 DBX 中打开该连接以触发 `connection/connect`）。
 
@@ -166,9 +168,23 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 | `opcua/browse` | `{ id, nodeId }` | 子节点列表 |
 | `opcua/read` | `{ id, nodeId }` | 读 `Value` |
 | `opcua/readMany` | `{ id, nodeIds: [...] }` | 一次读多个 `Value`（监视点轮询用，上限 500） |
-| `opcua/write` | `{ id, nodeId, dataType, value }` | 写标量值 |
+| `opcua/write` | `{ id, nodeId, dataType?, value }` | 写标量值，返回 `{ success, status, statusCode, dataType, message }` |
 
 连接 id 同时接受 `id`、`connectionId` 与嵌套 `connection.id`。`nodeIds` 同时接受 `["i=85"]` 与 `[{"nodeId":"i=85"}]`。
+
+### 写入的判定逻辑
+
+写入不是「发出去就算成功」，`opcua/write` 的行为如下：
+
+1. **先用一次读取拿到服务器的事实**：`DataType`（14）、`ValueRank`（15）、`UserAccessLevel`（18）。`ValueRank` 为数组/多维数组时直接报错，不再让服务器回一个含糊的 `BadTypeMismatch`。
+2. **类型以服务器为准**：`dataType: "Auto"`（UI 默认）或手动指定的类型只在服务器 `DataType` 是抽象类型/自定义结构时才生效。手动选一个与服务器不一致的类型不会「覆盖」它 —— 那样只会得到 `BadTypeMismatch`。响应里的 `dataTypeSource` 为 `server` 或 `request`。
+3. **值的解析对人宽容**：`Boolean` 接受 `true/false`、`1/0`、`yes/no`、`on/off`；数字接受前后空格、单个小数逗号（`1,5`）与 JSON 数字（`value: 12.5`，不限于字符串）；越界会说明是哪一类越界。
+4. **状态码即结论**：只有 `Good` 系列才 `success: true`。`BadNotWritable` / `BadUserAccessDenied` / `BadOutOfRange` 等一律 `success: false`，并附中文原因（`message`），UI 用红色显示，不再把失败渲染成「已写入」。
+5. **回读校验**：写成功后立即回读，若值没变（只读点位、被 PLC 程序覆盖、服务器忽略写入）会显式提示，而不是假装成功。
+
+### 连接时机
+
+`connection/connect` 会等到 OPC UA 握手（SecureChannel + `CreateSession`）真正完成才返回成功。此前该调用在握手开始前就返回，紧接着发出的第一条读/写请求会概率性失败于 `BadNotConnected: Unable to send request, transport is not connected`；`opcua/*` 方法现在也会等待会话就绪（自动重连窗口内同样适用），超时设为 10s。
 
 ## 待替换 / 已知限制
 

@@ -20,12 +20,15 @@
     </div>
   </header>
 
-  <main class="layout">
-    <!-- Left: address space tree (narrow) -->
-    <section class="tree-pane">
+  <main class="layout" id="layout">
+    <!-- Left: address space tree (narrow, its width is draggable) -->
+    <section class="tree-pane" id="treePane">
       <div class="pane-title">地址空间</div>
       <ul id="tree" class="tree"></ul>
     </section>
+
+    <div class="splitter" id="splitLeft" role="separator" aria-orientation="vertical"
+         tabindex="0" title="拖动调整宽度 · 双击复位"></div>
 
     <!-- Middle: drop target for points dragged out of the tree -->
     <section class="board-pane" id="boardPane">
@@ -53,8 +56,11 @@
       </div>
     </section>
 
+    <div class="splitter" id="splitRight" role="separator" aria-orientation="vertical"
+         tabindex="0" title="拖动调整宽度 · 双击复位"></div>
+
     <!-- Right: details of the selected point -->
-    <section class="detail-pane">
+    <section class="detail-pane" id="detailPane">
       <div class="pane-title">节点详情</div>
       <div id="detail" class="detail">
         <p class="hint">在左侧树或中间点位区选择一个点位查看详情。</p>

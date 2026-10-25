@@ -8,6 +8,7 @@
   --accent-soft: #e7eefb;
   --ok: #1a7f37;
   --err: #b42318;
+  --warn: #9a6700;
   --row-hover: #eef1f6;
 }
 
@@ -102,38 +103,73 @@ html, body {
 
 .tree-pane {
   flex: 0 0 236px;
-  border-right: 1px solid var(--border);
+  min-width: 0;
   overflow: auto;
 }
 
 .board-pane {
   flex: 1 1 auto;
   min-width: 0;
-  border-right: 1px solid var(--border);
   position: relative;
 }
 
 .detail-pane {
   flex: 0 0 302px;
+  min-width: 0;
   overflow: hidden;
+  position: relative;
+}
+
+/* Draggable dividers between the three columns ------------------------------ */
+.splitter {
+  flex: 0 0 9px;
+  position: relative;
+  cursor: col-resize;
+  background: var(--bg);
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+.splitter::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: var(--border);
+  transition: background 120ms, width 120ms, left 120ms;
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after,
+.splitter.dragging::after {
+  left: 3px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+body.col-drag,
+body.col-drag * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .detail-pane .detail { padding: 12px 14px; overflow: auto; flex: 1; }
 
 /* Highlight the whole board while a point is dragged over it. */
 .board-pane.drop-active { background: #f2f7ff; }
-.board-pane.drop-active::after {
+.detail-pane.drop-active { background: #f2f7ff; }
+.board-pane.drop-active::after,
+.detail-pane.drop-active::after {
   content: "";
   position: absolute;
   inset: 4px;
   border: 2px dashed var(--accent);
   border-radius: 8px;
   pointer-events: none;
-}
-
-@media (max-width: 960px) {
-  .tree-pane { flex-basis: 188px; }
-  .detail-pane { flex-basis: 250px; }
 }
 
 

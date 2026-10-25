@@ -61,6 +61,9 @@
   var watchList = $("watchList");
   var boardPane = $("boardPane");
   var dropHint = $("dropHint");
+  var layoutEl = $("layout");
+  var treePane = $("treePane");
+  var detailPane = $("detailPane");
 
   function setStatus(text, cls) {
     var el = $("status");
@@ -444,16 +447,47 @@
     syncDt(nodeId);
   }
 
+  // Data types the sidecar can build a Variant for. "Auto" asks the backend to read the
+  // node's DataType attribute, which is the default: hand-picking a type that disagrees
+  // with the server only ever produces BadTypeMismatch.
+  var WRITE_TYPES = [
+    "Boolean", "SByte", "Byte", "Int16", "UInt16", "Int32", "UInt32",
+    "Int64", "UInt64", "Float", "Double", "String",
+  ];
+
   function dtypeOptions(selected) {
-    var types = [
-      "Boolean", "SByte", "Byte", "Int16", "UInt16", "Int32", "UInt32",
-      "Int64", "UInt64", "Float", "Double", "String",
-    ];
-    return types
-      .map(function (t) {
-        return '<option value="' + t + '"' + (t === selected ? " selected" : "") + ">" + t + "</option>";
-      })
-      .join("");
+    var known = WRITE_TYPES.indexOf(selected) >= 0;
+    var html = '<option value="Auto"' + (known ? "" : " selected") + ">自动（按服务器类型）</option>";
+    WRITE_TYPES.forEach(function (t) {
+      html += '<option value="' + t + '"' + (t === selected ? " selected" : "") + ">" + t + "</option>";
+    });
+    return html;
+  }
+
+  // Human readable reason for a write the server rejected.
+  var WRITE_HINTS = {
+    BadTypeMismatch: "值类型与节点要求的类型不匹配",
+    BadNotWritable: "该节点不可写（只读点位或 PLC 侧未开放写权限）",
+    BadUserAccessDenied: "权限不足，当前用户不允许写入该节点",
+    BadNodeIdUnknown: "节点不存在",
+    BadOutOfRange: "值超出节点允许范围",
+    BadWriteNotSupported: "该节点不支持写入",
+    BadNotConnected: "会话已断开，请在 DBX 中重新打开连接",
+  };
+
+  // The backend returns { success, status, message }. `success` is authoritative: a Bad
+  // status code used to be rendered as a green "已写入", which looked like the write had
+  // worked while the PLC value never changed.
+  function writeFailText(res) {
+    var status = (res && res.status) || "Unknown";
+    var hint = (res && res.message) || WRITE_HINTS[status] || "";
+    return hint ? status + "（" + hint + "）" : status;
+  }
+
+  function readValueText(nodeId) {
+    var last = state.lasts[nodeId];
+    if (!last) return null;
+    return fmtValue(last.value);
   }
 
   async function readValue(nodeId) {
@@ -475,29 +509,71 @@
     }
   }
 
-  async function writeValue(nodeId) {
-    var dt = $("dt").value;
-    var v = $("wv").value;
+  function setWriteRes(text, color) {
     var out = $("writeRes");
+    if (!out) return;
+    out.textContent = text;
+    out.style.color = color || "var(--muted)";
+  }
+
+  async function writeValue(nodeId) {
+    var sel = $("dt");
+    var inp = $("wv");
+    if (!sel || !inp) return;
+    var dt = sel.value;
+    var raw = inp.value;
+    var before = readValueText(nodeId);
+
+    setWriteRes("写入中…", "var(--muted)");
+    var res;
     try {
-      var res = unwrap(
-        await invoke("opcua/write", {
-          id: state.connectionId, nodeId: nodeId, dataType: dt, value: v,
-        })
-      );
-      out.textContent = "写入结果：" + ((res && res.status) || "未知");
-      out.style.color = "var(--ok)";
-      toast("已写入 " + nodeId + " = " + v);
-      readValue(nodeId); // read back so the pane and the board show what the server took
+      res = unwrap(
+        await invoke(
+          "opcua/write",
+          { id: state.connectionId, nodeId: nodeId, dataType: dt, value: raw },
+          20000
+        )
+      ) || {};
     } catch (e) {
-      out.textContent = "写入失败：" + msg(e);
-      out.style.color = "var(--err)";
+      setWriteRes("写入失败：" + msg(e), "var(--err)");
+      toast("写入失败：" + msg(e), true);
+      return;
+    }
+
+    if (res.success === false) {
+      setWriteRes("写入失败：" + writeFailText(res), "var(--err)");
+      toast("写入失败：" + writeFailText(res), true);
+      return;
+    }
+
+    var usedType = res.dataType || dt;
+    setWriteRes("写入成功 · 类型 " + usedType + " · 状态 " + (res.status || "Good"), "var(--ok)");
+    toast("已写入 " + nodeId + " = " + raw);
+
+    // Read back: "Good" plus an unchanged value means the point is read-only in practice
+    // (simulated / computed / overwritten by the PLC program), which is worth saying out loud.
+    await readValue(nodeId);
+    var after = readValueText(nodeId);
+    if (before !== null && after !== null && before === after) {
+      setWriteRes(
+        "写入被接受（" + (res.status || "Good") + "），但回读值仍是 " + after +
+          "：该点位可能只读、由程序覆盖，或服务器忽略写入。",
+        "var(--warn)"
+      );
     }
   }
 
   // ----------------------------------------------------------------------
   // Drag & drop — points are dragged out of the tree into the middle board
   // ----------------------------------------------------------------------
+  function draggedNodeId(ev) {
+    var nodeId = state.dragNodeId;
+    if (!nodeId && ev.dataTransfer) {
+      try { nodeId = ev.dataTransfer.getData("text/plain"); } catch (e) { nodeId = ""; }
+    }
+    return nodeId;
+  }
+
   function bindDrop() {
     boardPane.addEventListener("dragover", function (ev) {
       ev.preventDefault(); // required, or the drop event never fires
@@ -511,10 +587,7 @@
       ev.preventDefault();
       boardPane.classList.remove("drop-active");
 
-      var nodeId = state.dragNodeId;
-      if (!nodeId && ev.dataTransfer) {
-        try { nodeId = ev.dataTransfer.getData("text/plain"); } catch (e) { nodeId = ""; }
-      }
+      var nodeId = draggedNodeId(ev);
       if (!nodeId) return;
 
       var node = state.nodes[nodeId] ? state.nodes[nodeId].data : null;
@@ -523,6 +596,165 @@
         return;
       }
       addWatch(node || { nodeId: nodeId, displayName: nodeId, nodeClass: "Variable" });
+    });
+
+    // Dropping on the detail pane means "show me this point" — no need to hunt for the
+    // tree row again after a drag.
+    if (detailPane) {
+      detailPane.addEventListener("dragover", function (ev) {
+        ev.preventDefault();
+        if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
+        detailPane.classList.add("drop-active");
+      });
+      detailPane.addEventListener("dragleave", function (ev) {
+        if (!detailPane.contains(ev.relatedTarget)) detailPane.classList.remove("drop-active");
+      });
+      detailPane.addEventListener("drop", function (ev) {
+        ev.preventDefault();
+        detailPane.classList.remove("drop-active");
+        var nodeId = draggedNodeId(ev);
+        if (nodeId) selectNode(nodeId);
+      });
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // Resizable columns
+  //
+  // The three panes keep fixed pixel widths stored in localStorage; the two dividers
+  // drag them, double-click resets, and the arrow keys nudge a focused divider.
+  // ----------------------------------------------------------------------
+  var COLS_KEY = "dbx-opcua-cols";
+  var COLS_DEFAULT = { tree: 236, detail: 302 };
+  var COL_MIN_TREE = 140;
+  var COL_MIN_DETAIL = 190;
+  var COL_MIN_BOARD = 200;
+
+  // Width the two handles themselves take; the panes must leave room for them.
+  function colsHandlesWidth() {
+    var sum = 0;
+    var l = $("splitLeft");
+    var r = $("splitRight");
+    if (l) sum += l.getBoundingClientRect().width;
+    if (r) sum += r.getBoundingClientRect().width;
+    return sum;
+  }
+
+  function colsClamp(treeW, detailW) {
+    var total = layoutEl ? layoutEl.getBoundingClientRect().width : 0;
+    if (!total) return { tree: treeW, detail: detailW };
+    var avail = total - colsHandlesWidth();
+    var maxTree = Math.max(COL_MIN_TREE, avail - detailW - COL_MIN_BOARD);
+    var tree = Math.max(COL_MIN_TREE, Math.min(treeW, maxTree));
+    var maxDetail = Math.max(COL_MIN_DETAIL, avail - tree - COL_MIN_BOARD);
+    var detail = Math.max(COL_MIN_DETAIL, Math.min(detailW, maxDetail));
+    return { tree: tree, detail: detail };
+  }
+
+  function colsApply(treeW, detailW) {
+    if (!treePane || !detailPane) return;
+    treePane.style.flex = "0 0 " + Math.round(treeW) + "px";
+    detailPane.style.flex = "0 0 " + Math.round(detailW) + "px";
+  }
+
+  function colsCurrent() {
+    return {
+      tree: treePane ? treePane.getBoundingClientRect().width : COLS_DEFAULT.tree,
+      detail: detailPane ? detailPane.getBoundingClientRect().width : COLS_DEFAULT.detail,
+    };
+  }
+
+  function colsSave(treeW, detailW) {
+    try {
+      localStorage.setItem(
+        COLS_KEY,
+        JSON.stringify({ tree: Math.round(treeW), detail: Math.round(detailW) })
+      );
+    } catch (e) { /* private mode: widths just don't persist */ }
+  }
+
+  function colsLoad() {
+    try {
+      var raw = localStorage.getItem(COLS_KEY);
+      var o = raw ? JSON.parse(raw) : null;
+      if (o && typeof o.tree === "number" && typeof o.detail === "number") {
+        return { tree: o.tree, detail: o.detail };
+      }
+    } catch (e) { /* ignore corrupt value */ }
+    return COLS_DEFAULT;
+  }
+
+  function colsStartDrag(ev, handle, kind) {
+    var startX = ev.clientX;
+    var start = colsCurrent();
+    handle.classList.add("dragging");
+    document.body.classList.add("col-drag");
+    try { handle.setPointerCapture(ev.pointerId); } catch (e) { /* older webview */ }
+
+    function onMove(e) {
+      var dx = e.clientX - startX;
+      var next =
+        kind === "tree"
+          ? colsClamp(start.tree + dx, start.detail)
+          : colsClamp(start.tree, start.detail - dx);
+      colsApply(next.tree, next.detail);
+    }
+    function onEnd() {
+      handle.classList.remove("dragging");
+      document.body.classList.remove("col-drag");
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onEnd);
+      handle.removeEventListener("pointercancel", onEnd);
+      var cur = colsCurrent();
+      colsSave(cur.tree, cur.detail);
+    }
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onEnd);
+    handle.addEventListener("pointercancel", onEnd);
+  }
+
+  function bindLayout() {
+    if (!layoutEl || !treePane || !detailPane) return;
+
+    var start = colsClamp(colsLoad().tree, colsLoad().detail);
+    colsApply(start.tree, start.detail);
+
+    [["splitLeft", "tree"], ["splitRight", "detail"]].forEach(function (pair) {
+      var handle = $(pair[0]);
+      var kind = pair[1];
+      if (!handle) return;
+
+      handle.addEventListener("pointerdown", function (ev) {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        colsStartDrag(ev, handle, kind);
+      });
+
+      handle.addEventListener("keydown", function (ev) {
+        var step = ev.shiftKey ? 48 : 12;
+        var delta = ev.key === "ArrowLeft" ? -step : ev.key === "ArrowRight" ? step : 0;
+        if (!delta) return;
+        ev.preventDefault();
+        var cur = colsCurrent();
+        var next =
+          kind === "tree"
+            ? colsClamp(cur.tree + delta, cur.detail)
+            : colsClamp(cur.tree, cur.detail - delta);
+        colsApply(next.tree, next.detail);
+        colsSave(next.tree, next.detail);
+      });
+
+      handle.addEventListener("dblclick", function () {
+        colsApply(COLS_DEFAULT.tree, COLS_DEFAULT.detail);
+        try { localStorage.removeItem(COLS_KEY); } catch (e) { /* ignore */ }
+      });
+    });
+
+    // A narrower host panel must not push the board out of view.
+    window.addEventListener("resize", function () {
+      var cur = colsCurrent();
+      var next = colsClamp(cur.tree, cur.detail);
+      colsApply(next.tree, next.detail);
     });
   }
 
@@ -723,20 +955,29 @@
   async function writeItem(nodeId, newVal) {
     var item = findItem(nodeId);
     if (!item) return;
-    var dt = lastDt(nodeId);
-    if (!dt || dt === "<null>" || dt === "<unsupported>") dt = "String";
+    var before = readValueText(nodeId);
 
+    var res;
     try {
-      await invoke(
-        "opcua/write",
-        { id: state.connectionId, nodeId: nodeId, dataType: dt, value: newVal },
-        10000
-      );
-      flash(nodeId, true);
-      toast("已写入 " + (item.displayName || nodeId) + " = " + newVal);
+      res = unwrap(
+        await invoke(
+          "opcua/write",
+          // "Auto" makes the backend read the node's DataType attribute. Sending a guessed
+          // type here (the previous behaviour: last read type, or "String" when unknown)
+          // is exactly what produced BadTypeMismatch on every numeric point.
+          { id: state.connectionId, nodeId: nodeId, dataType: "Auto", value: newVal },
+          20000
+        )
+      ) || {};
     } catch (e) {
       flash(nodeId, false);
       toast("写入失败：" + msg(e), true);
+      return;
+    }
+
+    if (res.success === false) {
+      flash(nodeId, false);
+      toast("写入失败：" + writeFailText(res), true);
       return;
     }
 
@@ -744,9 +985,21 @@
     try {
       var r = unwrap(
         await invoke("opcua/readMany", { id: state.connectionId, nodeIds: [nodeId] }, 10000)
+      ) || {};
+      applyValues(r.values || []);
+    } catch (e) { /* non-fatal: the next poll refreshes it */ }
+
+    var after = readValueText(nodeId);
+    if (before !== null && after !== null && before === after) {
+      flash(nodeId, false);
+      toast(
+        "写入被接受但值未变化：" + (item.displayName || nodeId) + " 可能只读或被程序覆盖",
+        true
       );
-      applyValues((r && r.values) || []);
-    } catch (e) { /* non-fatal: next poll will refresh */ }
+      return;
+    }
+    flash(nodeId, true);
+    toast("已写入 " + (item.displayName || nodeId) + " = " + newVal);
   }
 
   // ----------------------------------------------------------------------
@@ -844,6 +1097,7 @@
     await window.dbxPlugin.ready;
 
     bindDrop();
+    bindLayout();
 
     $("useBtn").addEventListener("click", function () {
       useConnection($("connId").value.trim() || $("connSelect").value);

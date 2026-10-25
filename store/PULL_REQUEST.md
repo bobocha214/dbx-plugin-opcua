@@ -23,7 +23,7 @@
 ### Capabilities
 
 - `connection-provider` — adds an **OPC UA** connection type. Form fields: connection name, host, port (default `4840`), user name, password (stored as a secret; anonymous when left empty).
-- `workbench` — **OPC UA Browser**, a three-column layout: the address space tree on the left (`Objects` / `Views` / `Types`), a drop board in the middle, the selected point's details on the right. Points are added by **dragging a `Variable` node** from the tree onto the board (non-`Variable` nodes are rejected with a hint); the board polls the selected points and a value can be edited in place to write it back immediately. Selecting a node or a board card shows its NodeId / BrowseName / DisplayName / NodeClass plus current value and write form.
+- `workbench` — **OPC UA Browser**, a three-column layout: the address space tree on the left (`Objects` / `Views` / `Types`), a drop board in the middle, the selected point's details on the right. Points are added by **dragging a `Variable` node** from the tree onto the board (non-`Variable` nodes are rejected with a hint); the board polls the selected points and a value can be edited in place to write it back immediately. The two column dividers are draggable (double-click resets, widths are remembered). Selecting a node or a board card shows its NodeId / BrowseName / DisplayName / NodeClass plus current value and write form. Writes resolve the node's `DataType` attribute server-side, surface the OPC UA status code on failure and read the value back to confirm it actually changed.
 
 Implemented sidecar methods: `plugin/initialize`, `connection/test`, `connection/connect`, `connection/disconnect`, `opcua/root`, `opcua/browse`, `opcua/read`, `opcua/readMany`, `opcua/write`.
 
