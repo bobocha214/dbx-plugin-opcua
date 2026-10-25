@@ -86,26 +86,56 @@ html, body {
 .layout {
   display: flex;
   height: calc(100% - 47px);
+  min-height: 0;
 }
 
-.tree-pane, .side-pane { overflow: auto; background: var(--panel); }
-
-.tree-pane { width: 42%; border-right: 1px solid var(--border); }
-
-/* Right column: detail on top, watch list below (flex, both scroll independently). */
-.side-pane {
-  flex: 1;
+/* Three columns: narrow tree | drop board (flex) | detail */
+.tree-pane,
+.board-pane,
+.detail-pane {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
   overflow: hidden;
-  min-width: 0;
 }
 
-.sub-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.detail-pane { flex: 1 1 45%; border-bottom: 1px solid var(--border); }
-.watch-pane { flex: 1 1 55%; }
+.tree-pane {
+  flex: 0 0 236px;
+  border-right: 1px solid var(--border);
+  overflow: auto;
+}
 
-.detail-pane .detail { padding: 14px; overflow: auto; flex: 1; }
+.board-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  position: relative;
+}
+
+.detail-pane {
+  flex: 0 0 302px;
+  overflow: hidden;
+}
+
+.detail-pane .detail { padding: 12px 14px; overflow: auto; flex: 1; }
+
+/* Highlight the whole board while a point is dragged over it. */
+.board-pane.drop-active { background: #f2f7ff; }
+.board-pane.drop-active::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+@media (max-width: 960px) {
+  .tree-pane { flex-basis: 188px; }
+  .detail-pane { flex-basis: 250px; }
+}
+
 
 .pane-title {
   padding: 8px 12px;
@@ -128,10 +158,13 @@ html, body {
   cursor: pointer;
   border-radius: 4px;
   white-space: nowrap;
+  overflow: hidden;
 }
 
 .node-row:hover { background: var(--row-hover); }
 .node-row.selected { background: var(--accent-soft); }
+.node-row[draggable="true"] { cursor: grab; }
+.node-row.dragging { opacity: .5; }
 
 .twisty {
   width: 14px;
@@ -153,7 +186,7 @@ html, body {
 .badge.Method { background: #fdecea; color: var(--err); }
 
 .node-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-.node-id { color: var(--muted); font-size: 11px; }
+.node-id { color: var(--muted); font-size: 11px; max-width: 46%; overflow: hidden; text-overflow: ellipsis; }
 
 /* "add to watch" affordance on Variable rows */
 .watch-add {
@@ -177,7 +210,7 @@ html, body {
 
 /* ---------------- Watch list ---------------- */
 
-.watch-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.board-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 .count {
   display: inline-block; min-width: 16px; padding: 0 5px;
@@ -199,15 +232,38 @@ html, body {
   border-radius: 6px; background: #fff; color: var(--text); font-size: 12px;
 }
 
-.watch-list { overflow: auto; flex: 1; padding: 6px 8px 12px; }
-.watch-empty { padding: 10px 4px; }
+.watch-list { overflow: auto; flex: 1; padding: 8px 10px 14px; }
+/* Empty list must not eat the space reserved for the drop hint. */
+.watch-list:empty { flex: 0 0 0; padding: 0; overflow: hidden; }
+
+/* Empty state doubles as the drop affordance. */
+.drop-hint {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+  pointer-events: none;
+}
+.drop-hint.hidden { display: none; }
+.drop-hint-inner p { margin: 4px 0; }
+.drop-icon {
+  font-size: 26px;
+  color: var(--accent);
+  opacity: .55;
+  margin-bottom: 6px;
+}
 
 .watch-item {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 8px; border: 1px solid var(--border);
   border-radius: 6px; margin-bottom: 6px; background: #fff;
+  cursor: pointer;
 }
 .watch-item:hover { background: var(--row-hover); }
+.watch-item.selected { border-color: var(--accent); background: var(--accent-soft); }
 
 .wi-main { flex: 1; min-width: 0; }
 .wi-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -217,7 +273,7 @@ html, body {
 
 /* the value itself — click to edit, Enter to write */
 .wi-v {
-  min-width: 76px; max-width: 190px;
+  min-width: 84px; max-width: 260px;
   padding: 3px 7px; border: 1px solid transparent; border-radius: 5px;
   background: #fafbfc; cursor: text;
   font-variant-numeric: tabular-nums;
@@ -245,9 +301,10 @@ html, body {
 }
 .wi-del:hover { background: #fdecea; color: var(--err); }
 
-.detail .kv { display: grid; grid-template-columns: 120px 1fr; gap: 6px 10px; margin-bottom: 12px; }
+.detail .kv { display: grid; grid-template-columns: 92px 1fr; gap: 6px 10px; margin-bottom: 12px; }
 .detail .kv .k { color: var(--muted); }
 .detail .kv .v { word-break: break-all; }
+.detail .kv .v.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; }
 
 .value-box {
   border: 1px solid var(--border);
@@ -257,7 +314,7 @@ html, body {
   background: #fafbfc;
 }
 
-.value-box .big { font-size: 16px; font-weight: 600; }
+.value-box .big { font-size: 16px; font-weight: 600; word-break: break-all; }
 .value-box .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 .write-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -267,7 +324,7 @@ html, body {
   border: 1px solid var(--border);
   border-radius: 6px;
 }
-.write-form input { flex: 1; min-width: 160px; }
+.write-form input { flex: 1; min-width: 0; }
 .write-form button {
   height: 28px; padding: 0 14px; border: none; border-radius: 6px;
   background: var(--accent); color: #fff; cursor: pointer;

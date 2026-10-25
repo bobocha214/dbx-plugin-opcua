@@ -32,8 +32,8 @@
     {
       "target": "windows-x64",
       "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.1.0/io.github.bobocha214.opcua-0.1.0-windows-x64.dbxp",
-      "sha256": "84609278b1b5d4040983d7d25b7fc6f701223330ea30df55a0033fc70afaa653",
-      "size": 2652460
+      "sha256": "8d94d6f84178fbfd062e9dc092ff265422cbf6d8d2bcd17f0be350ae6bddac56",
+      "size": 2649128
     }
   ]
 }

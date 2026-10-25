@@ -138,16 +138,18 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 
 > 安全边界：宿主返回给 UI 的连接列表是**脱敏的**（形如 `{ id, providerId, name, label }`，不含主机、端口、凭据）。因此 UI 不自行发起连接，只使用宿主已建立连接的 `connectionId`。
 
-### 浏览 / 读 / 写
-- 左侧树加载三个标准根：`Objects` (`i=85`)、`Types` (`i=86`)、`Views` (`i=87`)；按 `HierarchicalReferences` 前向展开，自动翻页 continuation point。
-- 选中 `Variable` 节点可读取 `Value`（含数据类型、状态码、时间戳），或选择数据类型写入标量值。
+### 界面布局（三栏）
+- **左**：地址空间树（窄栏，默认 236px），加载三个标准根 `Objects` (`i=85`)、`Types` (`i=86`)、`Views` (`i=87`)；按 `HierarchicalReferences` 前向展开，自动翻页 continuation point。
+- **中**：点位区。把左侧树上的 `Variable` 点位**拖动**到这里即加入；拖入 `Object` / `Method` 等非 `Variable` 节点会被拒绝并提示原因。
+- **右**：选中点位的详细信息（NodeId / BrowseName / DisplayName / NodeClass）、当前值（可「读取」）、写入表单，以及加入/移出点位区。
+- 点击左侧树节点或中间点位卡片都能选中该点位，树行与卡片高亮联动，右侧详情随之切换。左侧树没有展开过的点位（例如从 `localStorage` 恢复的）同样可以查看详情。
 
-### 监视点（右侧持续观察 + 就地改写下发）
-- 添加：树上 `Variable` 节点行悬停出现「＋」，或详情面板点「加入监视列表」。只有 `Variable` 可加入。
+### 点位区（持续观察 + 就地改写下发）
+- 添加：从左侧树拖入；或树上 `Variable` 行悬停出现「＋」；或右侧详情点「加入点位区」。只有 `Variable` 可加入。
 - 观察：点「▶ 持续观察」，按 200ms / 500ms / 1s / 2s / 5s 间隔轮询；走 **`opcua/readMany` 一次批量读**，N 个点只花一次往返。上一轮未返回时自动跳过本轮，避免堆积。
 - 改值下发：**鼠标点击数值** → 变成已全选的输入框 → 改完回车（或失焦）即 `opcua/write` 下发；`Esc` 取消。写入成功后自动回读该点，单元格绿色闪烁，失败红色闪烁并提示。
 - 轮询期间**不会覆盖你正在编辑的单元格**；写入用的数据类型取该点最近一次读到的 `dataType`。
-- 监视点按连接 id 存 `localStorage`，切换连接后自动恢复；`×` 移除，「清空」全清。
+- 点位区按连接 id 存 `localStorage`，切换连接后自动恢复；`×` 移除，「清空」全清。
 - 轮询失败会停止观察并提示（常见原因是会话未建立，需先在 DBX 中打开该连接以触发 `connection/connect`）。
 
 ## Sidecar 协议

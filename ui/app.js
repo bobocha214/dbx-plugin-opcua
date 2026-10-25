@@ -46,6 +46,10 @@
     nodes: {},       // nodeId -> { data, expanded, loaded, li, childUl }
     watch: [],       // [{ nodeId, displayName, browseName, dataType, value, status, sourceTimestamp }]
     watchEls: {},    // nodeId -> { row, v, dt }
+    lasts: {},       // nodeId -> last read result (also for points not in the watch list)
+    selected: "",    // nodeId currently shown in the right-hand detail pane
+    dragNodeId: "",  // nodeId being dragged out of the tree
+    dtDirty: false,  // user picked a write data type by hand -> stop auto-following
     polling: false,
     tickBusy: false,
     timer: null,
@@ -55,6 +59,8 @@
   var tree = $("tree");
   var detail = $("detail");
   var watchList = $("watchList");
+  var boardPane = $("boardPane");
+  var dropHint = $("dropHint");
 
   function setStatus(text, cls) {
     var el = $("status");
@@ -172,8 +178,10 @@
 
     state.connectionId = id;
     state.nodes = {};
+    state.lasts = {};
+    state.selected = "";
     tree.innerHTML = "";
-    detail.innerHTML = '<p class="hint">在左侧选择一个节点查看详情。</p>';
+    detail.innerHTML = '<p class="hint">在左侧树或中间点位区选择一个点位查看详情。</p>';
 
     loadWatch(id);
     renderWatch();
@@ -209,6 +217,23 @@
     var row = document.createElement("div");
     row.className = "node-row";
     row.dataset.nodeId = node.nodeId;
+
+    // Points are dragged from the tree into the middle board. Every node is
+    // draggable so the gesture always starts; the drop handler accepts only
+    // Variables and explains why anything else was rejected.
+    row.draggable = true;
+    row.addEventListener("dragstart", function (ev) {
+      state.dragNodeId = node.nodeId;
+      row.classList.add("dragging");
+      if (ev.dataTransfer) {
+        ev.dataTransfer.effectAllowed = "copy";
+        try { ev.dataTransfer.setData("text/plain", node.nodeId); } catch (e) { /* ignore */ }
+      }
+    });
+    row.addEventListener("dragend", function () {
+      state.dragNodeId = "";
+      row.classList.remove("dragging");
+    });
 
     var tw = document.createElement("span");
     tw.className = "twisty";
@@ -294,90 +319,160 @@
     node.expanded = true;
   }
 
+  // ----------------------------------------------------------------------
+  // Selection — drives the tree highlight, the board highlight and the detail pane
+  // ----------------------------------------------------------------------
   function selectNode(nodeId) {
+    state.selected = nodeId || "";
+    highlight(nodeId);
+    renderDetail(nodeId);
+  }
+
+  function highlight(nodeId) {
     var prev = tree.querySelector(".node-row.selected");
     if (prev) prev.classList.remove("selected");
     var node = state.nodes[nodeId];
     if (node) node.li.querySelector(".node-row").classList.add("selected");
-    renderDetail(nodeId);
+
+    Object.keys(state.watchEls).forEach(function (id) {
+      var el = state.watchEls[id];
+      if (el && el.row) el.row.classList.toggle("selected", id === nodeId);
+    });
+  }
+
+  // Identity for the detail pane. Works for points restored from storage whose
+  // tree row has never been browsed (state.nodes has no entry for them).
+  function nodeInfo(nodeId) {
+    var n = state.nodes[nodeId];
+    var w = findItem(nodeId);
+    var d = (n && n.data) || {};
+    return {
+      nodeId: nodeId,
+      browseName: d.browseName || (w && w.browseName) || "",
+      displayName: d.displayName || (w && w.displayName) || nodeId,
+      nodeClass: d.nodeClass || (w ? "Variable" : ""),
+    };
+  }
+
+  function lastDt(nodeId) {
+    if (state.lasts[nodeId] && state.lasts[nodeId].dataType) return state.lasts[nodeId].dataType;
+    var w = findItem(nodeId);
+    return (w && w.dataType) || "";
   }
 
   // ----------------------------------------------------------------------
   // Detail panel
   // ----------------------------------------------------------------------
-  function renderDetail(nodeId) {
-    var node = state.nodes[nodeId];
-    if (!node) {
-      detail.innerHTML = '<p class="hint">在左侧选择一个节点查看详情。</p>';
-      return;
-    }
-    var d = node.data;
-    var watched = !!findItem(nodeId);
-    var html = '<div class="kv">';
-    html += '<div class="k">NodeId</div><div class="v">' + esc(d.nodeId) + "</div>";
-    html += '<div class="k">BrowseName</div><div class="v">' + esc(d.browseName || "") + "</div>";
-    html += '<div class="k">DisplayName</div><div class="v">' + esc(d.displayName || "") + "</div>";
-    html += '<div class="k">NodeClass</div><div class="v">' + esc(d.nodeClass || "") + "</div>";
-    html += "</div>";
+  function valueBoxHtml(res) {
+    if (!res) return '<span class="hint">尚未读取。点击“读取”获取当前值。</span>';
+    var val = res.value === null || res.value === undefined ? "(null)" : res.value;
+    if (typeof val === "object") val = JSON.stringify(val);
+    return (
+      '<div class="big">' + esc(String(val)) + "</div>" +
+      '<div class="meta">类型: ' + esc(res.dataType || "") +
+      " · 状态: " + esc(res.status || "") +
+      (res.sourceTimestamp ? " · 时间: " + esc(res.sourceTimestamp) : "") +
+      "</div>"
+    );
+  }
 
-    if (d.nodeClass === "Variable") {
-      html += '<button id="watchBtn" class="watch-btn">' +
-        (watched ? "已在监视列表中" : "加入监视列表") + "</button>";
-      html += '<div class="section-label">当前值</div>';
-      html += '<div class="value-box" id="valueBox"><span class="hint">点击“读取”获取值。</span></div>';
-      html += '<button id="readBtn">读取</button>';
+  function refreshValueBox(nodeId) {
+    var box = $("valueBox");
+    if (!box || state.selected !== nodeId) return;
+    box.innerHTML = valueBoxHtml(state.lasts[nodeId]);
+    syncDt(nodeId);
+  }
 
-      html += '<div class="section-label">写入</div>';
-      html +=
-        '<div class="write-form">' +
-        '<select id="dt">' + dtypeOptions() + "</select>" +
-        '<input id="wv" type="text" placeholder="值" />' +
-        '<button id="writeBtn">写入</button>' +
-        "</div>";
-      html += '<div id="writeRes" class="hint" style="margin-top:8px;"></div>';
-      detail.innerHTML = html;
-
-      $("watchBtn").addEventListener("click", function () {
-        if (findItem(nodeId)) { removeWatch(nodeId); } else { addWatch(d); }
-        renderDetail(nodeId);
-      });
-      $("readBtn").addEventListener("click", function () { readValue(nodeId); });
-      $("writeBtn").addEventListener("click", function () { writeValue(nodeId); });
-    } else {
-      detail.innerHTML = html;
+  // Follow the data type the server reports, unless the user picked one by hand.
+  function syncDt(nodeId) {
+    if (state.dtDirty) return;
+    var sel = $("dt");
+    var dt = lastDt(nodeId);
+    if (!sel || !dt) return;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === dt) { sel.value = dt; return; }
     }
   }
 
-  function dtypeOptions() {
+  function renderDetail(nodeId) {
+    if (!nodeId) {
+      detail.innerHTML = '<p class="hint">在左侧树或中间点位区选择一个点位查看详情。</p>';
+      return;
+    }
+    var info = nodeInfo(nodeId);
+    var watched = !!findItem(nodeId);
+    var isVar = info.nodeClass === "Variable";
+    state.dtDirty = false;
+
+    var html = '<div class="kv">';
+    html += '<div class="k">NodeId</div><div class="v mono">' + esc(info.nodeId) + "</div>";
+    html += '<div class="k">BrowseName</div><div class="v">' + esc(info.browseName) + "</div>";
+    html += '<div class="k">DisplayName</div><div class="v">' + esc(info.displayName) + "</div>";
+    html += '<div class="k">NodeClass</div><div class="v">' + esc(info.nodeClass) + "</div>";
+    html += "</div>";
+
+    if (!isVar) {
+      detail.innerHTML = html + '<p class="hint">只有 Variable 点位可以读取与写入。</p>';
+      return;
+    }
+
+    html += '<button id="watchBtn" class="watch-btn">' +
+      (watched ? "移出点位区" : "加入点位区") + "</button>";
+    html += '<div class="section-label">当前值</div>';
+    html += '<div class="value-box" id="valueBox">' + valueBoxHtml(state.lasts[nodeId]) + "</div>";
+    html += '<button id="readBtn">读取</button>';
+
+    html += '<div class="section-label">写入</div>';
+    html +=
+      '<div class="write-form">' +
+      '<select id="dt">' + dtypeOptions(lastDt(nodeId)) + "</select>" +
+      '<input id="wv" type="text" placeholder="值" />' +
+      '<button id="writeBtn">写入</button>' +
+      "</div>";
+    html += '<div id="writeRes" class="hint" style="margin-top:8px;"></div>';
+    detail.innerHTML = html;
+
+    $("watchBtn").addEventListener("click", function () {
+      if (findItem(nodeId)) { removeWatch(nodeId); } else { addWatch(info); }
+    });
+    $("readBtn").addEventListener("click", function () { readValue(nodeId); });
+    $("writeBtn").addEventListener("click", function () { writeValue(nodeId); });
+    $("dt").addEventListener("change", function () { state.dtDirty = true; });
+    $("wv").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); writeValue(nodeId); }
+    });
+    syncDt(nodeId);
+  }
+
+  function dtypeOptions(selected) {
     var types = [
       "Boolean", "SByte", "Byte", "Int16", "UInt16", "Int32", "UInt32",
       "Int64", "UInt64", "Float", "Double", "String",
     ];
     return types
-      .map(function (t) { return '<option value="' + t + '">' + t + "</option>"; })
+      .map(function (t) {
+        return '<option value="' + t + '"' + (t === selected ? " selected" : "") + ">" + t + "</option>";
+      })
       .join("");
   }
 
   async function readValue(nodeId) {
-    var box = $("valueBox");
-    if (!box) return;
     try {
-      var res = unwrap(await invoke("opcua/read", { id: state.connectionId, nodeId: nodeId }));
-      renderValueBox(box, res);
+      var res = unwrap(await invoke("opcua/read", { id: state.connectionId, nodeId: nodeId })) || {};
+      state.lasts[nodeId] = res;
+      var item = findItem(nodeId);
+      if (item) {
+        item.value = res.value;
+        item.dataType = res.dataType || item.dataType;
+        item.status = res.status || "";
+        item.sourceTimestamp = res.sourceTimestamp || "";
+        paintItem(nodeId);
+      }
+      refreshValueBox(nodeId);
     } catch (e) {
-      box.innerHTML = '<span class="hint">读取失败：' + esc(msg(e)) + "</span>";
+      var box = $("valueBox");
+      if (box) box.innerHTML = '<span class="hint">读取失败：' + esc(msg(e)) + "</span>";
     }
-  }
-
-  function renderValueBox(box, res) {
-    var val = res && res.value !== undefined && res.value !== null ? res.value : "(null)";
-    if (typeof val === "object") val = JSON.stringify(val);
-    box.innerHTML =
-      '<div class="big">' + esc(String(val)) + "</div>" +
-      '<div class="meta">类型: ' + esc((res && res.dataType) || "") +
-      " · 状态: " + esc((res && res.status) || "") +
-      (res && res.sourceTimestamp ? " · 时间: " + esc(res.sourceTimestamp) : "") +
-      "</div>";
   }
 
   async function writeValue(nodeId) {
@@ -392,10 +487,43 @@
       );
       out.textContent = "写入结果：" + ((res && res.status) || "未知");
       out.style.color = "var(--ok)";
+      toast("已写入 " + nodeId + " = " + v);
+      readValue(nodeId); // read back so the pane and the board show what the server took
     } catch (e) {
       out.textContent = "写入失败：" + msg(e);
       out.style.color = "var(--err)";
     }
+  }
+
+  // ----------------------------------------------------------------------
+  // Drag & drop — points are dragged out of the tree into the middle board
+  // ----------------------------------------------------------------------
+  function bindDrop() {
+    boardPane.addEventListener("dragover", function (ev) {
+      ev.preventDefault(); // required, or the drop event never fires
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
+      boardPane.classList.add("drop-active");
+    });
+    boardPane.addEventListener("dragleave", function (ev) {
+      if (!boardPane.contains(ev.relatedTarget)) boardPane.classList.remove("drop-active");
+    });
+    boardPane.addEventListener("drop", function (ev) {
+      ev.preventDefault();
+      boardPane.classList.remove("drop-active");
+
+      var nodeId = state.dragNodeId;
+      if (!nodeId && ev.dataTransfer) {
+        try { nodeId = ev.dataTransfer.getData("text/plain"); } catch (e) { nodeId = ""; }
+      }
+      if (!nodeId) return;
+
+      var node = state.nodes[nodeId] ? state.nodes[nodeId].data : null;
+      if (node && node.nodeClass && node.nodeClass !== "Variable") {
+        toast("只能拖入 Variable 点位（" + node.nodeClass + " 不可读取/写入）", true);
+        return;
+      }
+      addWatch(node || { nodeId: nodeId, displayName: nodeId, nodeClass: "Variable" });
+    });
   }
 
   // ----------------------------------------------------------------------
@@ -411,10 +539,10 @@
   function addWatch(node) {
     if (!node || !node.nodeId) return;
     if (node.nodeClass && node.nodeClass !== "Variable") {
-      toast("只有 Variable 节点可以加入监视列表", true);
+      toast("只有 Variable 点位可以加入点位区", true);
       return;
     }
-    if (findItem(node.nodeId)) { toast("该点位已在监视列表中"); return; }
+    if (findItem(node.nodeId)) { toast("该点位已在点位区中"); return; }
     state.watch.push({
       nodeId: node.nodeId,
       displayName: node.displayName || node.browseName || node.nodeId,
@@ -427,7 +555,9 @@
     saveWatch();
     renderWatch();
     syncWatchButtons();
-    toast("已加入监视：" + (node.displayName || node.nodeId));
+    selectNode(node.nodeId); // dropping a point selects it: the detail pane follows
+    if (state.polling) tick();
+    toast("已加入点位区：" + (node.displayName || node.nodeId));
   }
 
   function removeWatch(nodeId) {
@@ -435,6 +565,7 @@
     saveWatch();
     renderWatch();
     syncWatchButtons();
+    if (state.selected === nodeId) renderDetail(nodeId); // refresh the join/leave button
   }
 
   function syncWatchButtons() {
@@ -455,16 +586,16 @@
     var count = $("watchCount");
     if (count) count.textContent = String(state.watch.length);
 
-    if (!state.watch.length) {
-      watchList.innerHTML =
-        '<p class="hint watch-empty">还没有监视点。在左侧树上点 Variable 节点的「＋」，' +
-        "或在详情面板点「加入监视列表」。</p>";
-      return;
-    }
+    // The empty state lives outside the list so it can double as the drop hint.
+    dropHint.classList.toggle("hidden", state.watch.length > 0);
+    if (!state.watch.length) return;
 
     state.watch.forEach(function (item) {
       var row = document.createElement("div");
-      row.className = "watch-item";
+      row.className = "watch-item" + (state.selected === item.nodeId ? " selected" : "");
+      row.dataset.nodeId = item.nodeId;
+      // Clicking a card selects the point -> its details show in the right column.
+      row.addEventListener("click", function () { selectNode(item.nodeId); });
 
       var main = document.createElement("div");
       main.className = "wi-main";
@@ -486,7 +617,7 @@
       v.className = "wi-v stale";
       v.textContent = fmtValue(item.value);
       v.title = "点击直接修改，回车下发写入";
-      v.addEventListener("click", function () { beginEdit(item.nodeId); });
+      v.addEventListener("click", function (ev) { ev.stopPropagation(); beginEdit(item.nodeId); });
 
       var dt = document.createElement("span");
       dt.className = "wi-dt";
@@ -499,7 +630,7 @@
       del.className = "wi-del";
       del.textContent = "×";
       del.title = "移除";
-      del.addEventListener("click", function () { removeWatch(item.nodeId); });
+      del.addEventListener("click", function (ev) { ev.stopPropagation(); removeWatch(item.nodeId); });
 
       row.appendChild(main);
       row.appendChild(valWrap);
@@ -510,28 +641,38 @@
     });
   }
 
+  // Repaint one board cell from the freshest data we have for that node.
+  function paintItem(nodeId) {
+    var el = state.watchEls[nodeId];
+    if (!el || el.v.classList.contains("editing")) return;
+    var item = findItem(nodeId);
+    var last = state.lasts[nodeId] || {};
+    var status = (item && item.status) || last.status || "";
+    var ts = (item && item.sourceTimestamp) || last.sourceTimestamp || "";
+    var name = (item && item.displayName) || nodeId;
+    el.v.textContent = fmtValue(item ? item.value : last.value);
+    el.v.classList.remove("stale");
+    el.dt.textContent = (item && item.dataType) || last.dataType || "";
+    el.v.title =
+      name +
+      (status ? " · 状态: " + status : "") +
+      (ts ? " · 时间: " + ts : "") +
+      "\n点击直接修改，回车下发写入";
+  }
+
   function applyValues(values) {
     values.forEach(function (r) {
+      state.lasts[r.nodeId] = r;
       var item = findItem(r.nodeId);
-      if (!item) return;
-      item.value = r.value;
-      item.dataType = r.dataType || item.dataType;
-      item.status = r.status || "";
-      item.sourceTimestamp = r.sourceTimestamp || "";
-
-      var el = state.watchEls[r.nodeId];
-      if (!el) return;
-      // Never clobber a cell the user is currently typing into.
-      if (el.v.classList.contains("editing")) return;
-      el.v.textContent = fmtValue(r.value);
-      el.v.classList.remove("stale");
-      el.dt.textContent = item.dataType || "";
-      el.v.title =
-        item.displayName +
-        (item.status ? " · 状态: " + item.status : "") +
-        (item.sourceTimestamp ? " · 时间: " + item.sourceTimestamp : "") +
-        "\n点击直接修改，回车下发写入";
+      if (item) {
+        item.value = r.value;
+        item.dataType = r.dataType || item.dataType;
+        item.status = r.status || "";
+        item.sourceTimestamp = r.sourceTimestamp || "";
+      }
+      paintItem(r.nodeId);
     });
+    if (state.selected) refreshValueBox(state.selected);
   }
 
   function flash(nodeId, ok) {
@@ -582,7 +723,7 @@
   async function writeItem(nodeId, newVal) {
     var item = findItem(nodeId);
     if (!item) return;
-    var dt = item.dataType;
+    var dt = lastDt(nodeId);
     if (!dt || dt === "<null>" || dt === "<unsupported>") dt = "String";
 
     try {
@@ -701,6 +842,8 @@
       return;
     }
     await window.dbxPlugin.ready;
+
+    bindDrop();
 
     $("useBtn").addEventListener("click", function () {
       useConnection($("connId").value.trim() || $("connSelect").value);
