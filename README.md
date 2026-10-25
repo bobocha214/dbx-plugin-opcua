@@ -37,8 +37,8 @@ dbx-plugin package . --target windows-x64 --output-dir dist
 产物（未签名审核候选包）：
 
 ```
-dist/io.github.yuzhi.opcua-0.1.0-<target>.dbxp
-dist/io.github.yuzhi.opcua-0.1.0-<target>.artifact.json
+dist/io.github.bobocha214.opcua-0.1.0-<target>.dbxp
+dist/io.github.bobocha214.opcua-0.1.0-<target>.artifact.json
 ```
 
 本地安装测试：在 DBX 插件中心开启「允许安装未签名开发包」后安装该 `.dbxp`。
@@ -51,7 +51,7 @@ dist/io.github.yuzhi.opcua-0.1.0-<target>.artifact.json
 
 官方文档要求：**包含原生 Sidecar 的插件需按操作系统和 CPU 架构分别构建**，不存在一个跨平台的通用包（只有纯前端插件才能打 `universal` 包）。
 
-因此多平台通过 CI 实现：`.github/workflows/plugin-release.yml` 复用上游的 `t8y2/dbx/.github/workflows/plugin-release-reusable.yml@plugin-sdk-v1`，在 `release: published` 时**按目标平台各构建一个 `.dbxp`**，随 Release 发布：
+因此多平台通过 CI 实现：`.github/workflows/plugin-release.yml` 复用上游的 `t8y2/dbx/.github/workflows/plugin-release-reusable.yml`（pin 到 commit SHA，不用 `@plugin-sdk-v1` —— 该 ref 在上游并不存在），在 `release: published` 时**按目标平台各构建一个 `.dbxp`**，随 Release 发布：
 
 | 平台 | target |
 |------|--------|
@@ -89,14 +89,14 @@ git tag v0.1.0 && git push origin v0.1.0
 
 ```bash
 # 仅本地已构建的平台（默认读取 dist/*.artifact.json）
-node scripts/build-store-candidate.mjs --repo yuzhi/dbx-plugin-opcua --tag v0.1.0
+node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag v0.1.0
 
 # Release 已发布、拿到全部平台后（下载 Release 里的 release-candidates.json）
-node scripts/build-store-candidate.mjs --repo yuzhi/dbx-plugin-opcua --tag v0.1.0 \
+node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag v0.1.0 \
   --release-candidates ./release-candidates.json
 ```
 
-脚本从**真实构建产物**读取 SHA-256 与大小写入 `store/candidates/io.github.yuzhi.opcua.json`，不要手抄这两个值——签名工作流会逐字节比对，不一致直接拒绝。重新打包后哈希会变，必须重新生成。
+脚本从**真实构建产物**读取 SHA-256 与大小写入 `store/candidates/io.github.bobocha214.opcua.json`，不要手抄这两个值——签名工作流会逐字节比对，不一致直接拒绝。重新打包后哈希会变，必须重新生成。
 
 > 汇总文件不会自动识别：只有显式传 `--release-candidates` 才会使用。因为一份与实际上传字节不符的陈旧清单会 pin 错哈希。
 
@@ -110,8 +110,8 @@ fork `t8y2/dbx-store`，在 PR 中加入两个文件（**只加这两个**）：
 
 | 本仓库文件 | 放到 dbx-store 的 |
 |---|---|
-| `store/publishers/yuzhi.json` | `publishers/yuzhi.json` |
-| `store/candidates/io.github.yuzhi.opcua.json` | `candidates/io.github.yuzhi.opcua.json` |
+| `store/publishers/bobocha214.json` | `publishers/bobocha214.json` |
+| `store/candidates/io.github.bobocha214.opcua.json` | `candidates/io.github.bobocha214.opcua.json` |
 
 PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data access、network access、native sidecar behavior）。
 
@@ -170,7 +170,7 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 
 ## 待替换 / 已知限制
 
-- `manifest.json` 的 `source` / `homepage` 指向 `https://github.com/yuzhi/dbx-plugin-opcua`；若仓库地址不同请一并修改（改 manifest 会改变包内容，需重新打包并重新生成候选元数据）。
+- 插件身份：`id` = `io.github.bobocha214.opcua`，`publisher` = `bobocha214`，与 GitHub 账号 `bobocha214` 及仓库 `https://github.com/bobocha214/dbx-plugin-opcua` 一致；`source` / `homepage` 指向该仓库。改动其中任何一项都会改变包内容，需重新打包并重新生成候选元数据。
 - 许可证：仓库 `LICENSE` 与 `backend/Cargo.toml` 均为 **MIT**，商店条目的 `license` 字段保持一致。
 - 仅 `None` 安全策略；写入仅支持标量类型；未实现订阅与方法调用。
 - 本插件自行实现 JSON-RPC（未使用官方 `dbx-plugin-sdk`），因为 `async-opcua` 需要常驻 tokio runtime 驱动会话事件循环，而 SDK 的 handler 是同步的。协议行为已按 SDK 源码对齐。
@@ -185,7 +185,7 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 {
   "protocolVersion": 1,
   "capabilities": ["connections"],
-  "plugin": { "id": "io.github.yuzhi.opcua", "version": "0.1.0" }
+  "plugin": { "id": "io.github.bobocha214.opcua", "version": "0.1.0" }
 }
 ```
 

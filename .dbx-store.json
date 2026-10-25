@@ -14,8 +14,8 @@
     "host.workbench",
     "host.connections:read"
   ],
-  "source": "https://github.com/yuzhi/dbx-plugin-opcua",
-  "homepage": "https://github.com/yuzhi/dbx-plugin-opcua",
+  "source": "https://github.com/bobocha214/dbx-plugin-opcua",
+  "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "license": "MIT",
   "releaseNotes": "Initial release: OPC UA connection provider, address space browser, typed node reads and guarded writes.",
   "localizations": {

@@ -3,8 +3,8 @@
 
   // Identity — must match manifest.json. Used to tell OPC UA connections apart from
   // other plugins' connections (e.g. a Modbus device) in the host's connection list.
-  var PLUGIN_ID = "io.github.yuzhi.opcua";
-  var PROVIDER_ID = "io.github.yuzhi.opcua.connection";
+  var PLUGIN_ID = "io.github.bobocha214.opcua";
+  var PROVIDER_ID = "io.github.bobocha214.opcua.connection";
   var DB_TYPE = "opcua";
 
   var WATCH_KEY_PREFIX = "dbx-opcua-watch:";

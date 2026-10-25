@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.yuzhi.opcua",
-  "publisher": "yuzhi",
+  "id": "io.github.bobocha214.opcua",
+  "publisher": "bobocha214",
   "version": "0.1.0",
   "name": "OPC UA",
   "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values with data type aware decoding.",
-  "icon": "https://raw.githubusercontent.com/yuzhi/dbx-plugin-opcua/v0.1.0/assets/plugin.svg",
+  "icon": "https://raw.githubusercontent.com/bobocha214/dbx-plugin-opcua/v0.1.0/assets/plugin.svg",
   "tags": [
     "opcua",
     "opc-ua",
@@ -18,8 +18,8 @@
     "host.connections:read",
     "host.workbench"
   ],
-  "source": "https://github.com/yuzhi/dbx-plugin-opcua/tree/v0.1.0",
-  "homepage": "https://github.com/yuzhi/dbx-plugin-opcua",
+  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.1.0",
+  "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "license": "MIT",
   "releaseNotes": "Initial release: OPC UA connection provider, address space browser, typed node reads and guarded writes.",
   "localizations": {
@@ -31,9 +31,9 @@
   "targets": [
     {
       "target": "windows-x64",
-      "url": "https://github.com/yuzhi/dbx-plugin-opcua/releases/download/v0.1.0/io.github.yuzhi.opcua-0.1.0-windows-x64.dbxp",
-      "sha256": "ac27d60f6153e57de6b3950a74a80377e6aaf5a78e654f718e1734eb4ae172f7",
-      "size": 2647320
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.1.0/io.github.bobocha214.opcua-0.1.0-windows-x64.dbxp",
+      "sha256": "84609278b1b5d4040983d7d25b7fc6f701223330ea30df55a0033fc70afaa653",
+      "size": 2652460
     }
   ]
 }

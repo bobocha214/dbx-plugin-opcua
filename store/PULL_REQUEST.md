@@ -4,8 +4,8 @@
 
   用法：fork t8y2/dbx-store 后新建 PR，把下面正文粘进 PR 描述框。
   同时在本 PR 中加入两个文件：
-    publishers/yuzhi.json                      <- store/publishers/yuzhi.json
-    candidates/io.github.yuzhi.opcua.json      <- 由 node scripts/build-store-candidate.mjs 生成
+    publishers/bobocha214.json                      <- store/publishers/bobocha214.json
+    candidates/io.github.bobocha214.opcua.json      <- 由 node scripts/build-store-candidate.mjs 生成
   CI 在签名完成前会一直保持红色（open candidate(s) awaiting DBX Store signing），属正常。
 -->
 
@@ -13,12 +13,12 @@
 
 | | |
 |---|---|
-| Plugin ID | `io.github.yuzhi.opcua` |
+| Plugin ID | `io.github.bobocha214.opcua` |
 | Version | `0.1.0` |
-| Publisher | `yuzhi` |
+| Publisher | `bobocha214` |
 | License | MIT (see `LICENSE`; matches `backend/Cargo.toml`) |
-| Source | https://github.com/yuzhi/dbx-plugin-opcua/tree/v0.1.0 |
-| Release | https://github.com/yuzhi/dbx-plugin-opcua/releases/tag/v0.1.0 |
+| Source | https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.1.0 |
+| Release | https://github.com/bobocha214/dbx-plugin-opcua/releases/tag/v0.1.0 |
 
 ### Capabilities
 
@@ -58,6 +58,6 @@ Not requested: `host.storage` (the watch list uses the page's own `localStorage`
 
 ### Review aids
 
-- Source: https://github.com/yuzhi/dbx-plugin-opcua/tree/v0.1.0
-- Unsigned candidates and `release-candidates.json` are attached to release `v0.1.0`; the SHA-256 and size in `candidates/io.github.yuzhi.opcua.json` pin those exact bytes.
+- Source: https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.1.0
+- Unsigned candidates and `release-candidates.json` are attached to release `v0.1.0`; the SHA-256 and size in `candidates/io.github.bobocha214.opcua.json` pin those exact bytes.
 - `verified` is left to maintainers; this submission does not set it.

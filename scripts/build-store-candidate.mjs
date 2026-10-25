@@ -6,7 +6,7 @@
 // mismatch, so these values must come from the real build output, never by hand.
 //
 // Usage:
-//   node scripts/build-store-candidate.mjs --repo yuzhi/dbx-plugin-opcua --tag v0.1.0
+//   node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag v0.1.0
 //
 // Artifact sources:
 //   dist/*.artifact.json          default; one entry per locally built package
@@ -32,7 +32,7 @@ function arg(name, fallback) {
   return index !== -1 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
 }
 
-const repo = arg("repo", "yuzhi/dbx-plugin-opcua");
+const repo = arg("repo", "bobocha214/dbx-plugin-opcua");
 const distDir = arg("dist", join(root, "dist"));
 const outArg = arg("out", "");
 
