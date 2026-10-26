@@ -5,7 +5,7 @@
   用法：fork t8y2/dbx-store 后新建 PR，把下面正文粘进 PR 描述框。
   同时在本 PR 中加入两个文件：
     publishers/bobocha214.json                      <- store/publishers/bobocha214.json
-    candidates/io.github.bobocha214.opcua.json      <- 由 node scripts/build-store-candidate.mjs 生成
+    candidates/io.github.yuzhi.opcua.json      <- 由 node scripts/build-store-candidate.mjs 生成
   CI 在签名完成前会一直保持红色（open candidate(s) awaiting DBX Store signing），属正常。
 -->
 
@@ -13,7 +13,7 @@
 
 | | |
 |---|---|
-| Plugin ID | `io.github.bobocha214.opcua` |
+| Plugin ID | `io.github.yuzhi.opcua` |
 | Version | `0.2.0` |
 | Publisher | `bobocha214` |
 | License | MIT (see `LICENSE`; matches `backend/Cargo.toml`) |
@@ -61,5 +61,5 @@ Not requested: `host.storage` (the watch list uses the page's own `localStorage`
 ### Review aids
 
 - Source: https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.0
-- Unsigned candidates and `release-candidates.json` are attached to release `v0.2.0`; the SHA-256 and size in `candidates/io.github.bobocha214.opcua.json` pin those exact bytes.
+- Unsigned candidates and `release-candidates.json` are attached to release `v0.2.0`; the SHA-256 and size in `candidates/io.github.yuzhi.opcua.json` pin those exact bytes.
 - `verified` is left to maintainers; this submission does not set it.

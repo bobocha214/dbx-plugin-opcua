@@ -1,10 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
   "manifest_version": 1,
-  "id": "io.github.bobocha214.opcua",
+  "id": "io.github.yuzhi.opcua",
   "name": "OPC UA",
-  "version": "0.2.0",
-  "publisher": "bobocha214",
+  "version": "0.2.1",
+  "publisher": "yuzhi",
   "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values.",
   "source": "https://github.com/bobocha214/dbx-plugin-opcua",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
@@ -33,7 +33,7 @@
   "contributions": [
     {
       "type": "connection-provider",
-      "id": "io.github.bobocha214.opcua.connection",
+      "id": "io.github.yuzhi.opcua.connection",
       "label": "OPC UA",
       "icon": "assets/connection.svg",
       "database_type": "opcua",
@@ -76,12 +76,12 @@
           "binding": "secret"
         }
       ],
-      "workbench": "io.github.bobocha214.opcua.workbench",
+      "workbench": "io.github.yuzhi.opcua.workbench",
       "capabilities": ["test", "connect", "disconnect"]
     },
     {
       "type": "workbench",
-      "id": "io.github.bobocha214.opcua.workbench",
+      "id": "io.github.yuzhi.opcua.workbench",
       "label": "OPC UA browser",
       "description": "Browse the OPC UA address space, then read and write node values.",
       "icon": "assets/plugin.svg"
@@ -92,7 +92,7 @@
       "name": "OPC UA",
       "description": "OPC UA 客户端读写插件：连接 PLC/服务器，浏览地址空间，读取与写入节点值。",
       "contributions": {
-        "io.github.bobocha214.opcua.connection": {
+        "io.github.yuzhi.opcua.connection": {
           "label": "OPC UA 连接",
           "description": "连接到 OPC UA 服务器 / PLC。",
           "fields": {
@@ -103,7 +103,7 @@
             "password": { "label": "密码" }
           }
         },
-        "io.github.bobocha214.opcua.workbench": {
+        "io.github.yuzhi.opcua.workbench": {
           "label": "OPC UA 浏览器",
           "description": "浏览 OPC UA 地址空间，读取与写入节点值。"
         }

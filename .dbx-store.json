@@ -17,7 +17,7 @@
   "source": "https://github.com/bobocha214/dbx-plugin-opcua",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "license": "MIT",
-  "releaseNotes": "0.2.0: plugin id is now io.github.bobocha214.opcua and the licence is MIT -- connections from 0.1.0 are not migrated, re-add them once. New icons; three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes wait for the session handshake, resolve the node DataType server-side, report the OPC UA status code on failure and read the value back.",
+  "releaseNotes": "0.2.1: new plugin and connection icons; three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes wait for the session handshake, resolve the node DataType server-side, report the OPC UA status code on failure and read the value back. Plugin id and publisher are unchanged, so connections saved by 0.1.0 keep working. The project licence is now MIT.",
   "localizations": {
     "zh-CN": {
       "name": "OPC UA",
