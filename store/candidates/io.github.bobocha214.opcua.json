@@ -21,7 +21,7 @@
   "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.0",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "license": "MIT",
-  "releaseNotes": "0.2.0: new plugin and connection icons; three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes resolve the node DataType server-side, report the OPC UA status code on failure and read the value back.",
+  "releaseNotes": "0.2.0: plugin id is now io.github.bobocha214.opcua and the licence is MIT -- connections from 0.1.0 are not migrated, re-add them once. New icons; three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes wait for the session handshake, resolve the node DataType server-side, report the OPC UA status code on failure and read the value back.",
   "localizations": {
     "zh-CN": {
       "name": "OPC UA",
@@ -30,10 +30,34 @@
   },
   "targets": [
     {
+      "target": "darwin-arm64",
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.0/io.github.bobocha214.opcua-0.2.0-darwin-arm64.dbxp",
+      "sha256": "1393c925748989190c38043193de54bee0e5ed358c5effbb086da18d2d7a42f9",
+      "size": 2394007
+    },
+    {
+      "target": "darwin-x64",
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.0/io.github.bobocha214.opcua-0.2.0-darwin-x64.dbxp",
+      "sha256": "e9bd7e6455312a5f9add7b9f13890833b933924a22b7bd1c7d7c96e2510c2d1c",
+      "size": 2520222
+    },
+    {
+      "target": "linux-arm64",
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.0/io.github.bobocha214.opcua-0.2.0-linux-arm64.dbxp",
+      "sha256": "406fac78b6a86b0e5f4ff70b7082285d0698bf9dbf014af4bb33da0a03bc7590",
+      "size": 2530855
+    },
+    {
+      "target": "linux-x64",
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.0/io.github.bobocha214.opcua-0.2.0-linux-x64.dbxp",
+      "sha256": "b773f77f2423a8f2e2ede0a37c610518db253f3d8727392e55070e114020bbc1",
+      "size": 2645727
+    },
+    {
       "target": "windows-x64",
       "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.0/io.github.bobocha214.opcua-0.2.0-windows-x64.dbxp",
-      "sha256": "75a52cff226006bfde37886d563ce5f65628644953f4681a25e874d0faf2eacd",
-      "size": 2666805
+      "sha256": "c99ba7d718ba4b0dd94dea6513ca217cb701a09819f917c1b318801631c99831",
+      "size": 2658484
     }
   ]
 }
