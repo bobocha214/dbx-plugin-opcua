@@ -35,7 +35,7 @@
       "type": "connection-provider",
       "id": "io.github.yuzhi.opcua.connection",
       "label": "OPC UA",
-      "icon": "assets/connection.svg",
+      "icon": "assets/plugin.svg",
       "database_type": "opcua",
       "description": "Connect to an OPC UA server such as a PLC or an industrial gateway.",
       "fields": [
