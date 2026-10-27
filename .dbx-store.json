@@ -1,6 +1,6 @@
 {
   "name": "OPC UA",
-  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values with data type aware decoding.",
+  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values with data type aware decoding. Connects directly to the opc.tcp://host:port you enter (default 4840); server certificates are verified by default.",
   "icon": "assets/plugin.svg",
   "tags": [
     "opcua",
@@ -17,7 +17,7 @@
   "source": "https://github.com/bobocha214/dbx-plugin-opcua",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "license": "MIT",
-  "releaseNotes": "0.2.0: plugin id is now io.github.bobocha214.opcua and the licence is MIT -- connections from 0.1.0 are not migrated, re-add them once. New icons; three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes wait for the session handshake, resolve the node DataType server-side, report the OPC UA status code on failure and read the value back.",
+  "releaseNotes": "0.2.0: this is a version update of the existing io.github.yuzhi.opcua (publisher yuzhi), not a new id -- your 0.1.0 connection carries over. Security: server certificates are now verified by default; a per-connection 'trust any certificate (insecure)' toggle replaces the previous always-on trust, so username/password auth is no longer exposed to a man-in-the-middle by default. The package now bundles LICENSE (MIT) and a THIRD-PARTY notice covering the MPL-2.0 static dependencies (async-opcua 0.19). New icons; three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes wait for the session handshake, resolve the node DataType server-side, report the OPC UA status code on failure and read the value back. Editing a watched value and pressing Enter (or blurring) writes it immediately.",
   "localizations": {
     "zh-CN": {
       "name": "OPC UA",

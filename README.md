@@ -48,8 +48,8 @@ dbx-plugin package . --target windows-x64 --output-dir dist
 产物（未签名审核候选包）：
 
 ```
-dist/io.github.bobocha214.opcua-0.2.0-<target>.dbxp
-dist/io.github.bobocha214.opcua-0.2.0-<target>.artifact.json
+dist/io.github.yuzhi.opcua-0.2.0-<target>.dbxp
+dist/io.github.yuzhi.opcua-0.2.0-<target>.artifact.json
 ```
 
 本地安装测试：在 DBX 插件中心开启「允许安装未签名开发包」后安装该 `.dbxp`。
@@ -107,7 +107,7 @@ node scripts/build-store-candidate.mjs --repo bobocha214/dbx-plugin-opcua --tag 
   --release-candidates ./release-candidates.json
 ```
 
-脚本从**真实构建产物**读取 SHA-256 与大小写入 `store/candidates/io.github.bobocha214.opcua.json`，不要手抄这两个值——签名工作流会逐字节比对，不一致直接拒绝。重新打包后哈希会变，必须重新生成。
+脚本从**真实构建产物**读取 SHA-256 与大小写入 `store/candidates/io.github.yuzhi.opcua.json`，不要手抄这两个值——签名工作流会逐字节比对，不一致直接拒绝。重新打包后哈希会变，必须重新生成。
 
 > 汇总文件不会自动识别：只有显式传 `--release-candidates` 才会使用。因为一份与实际上传字节不符的陈旧清单会 pin 错哈希。
 
@@ -121,8 +121,8 @@ fork `t8y2/dbx-store`，在 PR 中加入两个文件（**只加这两个**）：
 
 | 本仓库文件 | 放到 dbx-store 的 |
 |---|---|
-| `store/publishers/bobocha214.json` | `publishers/bobocha214.json` |
-| `store/candidates/io.github.bobocha214.opcua.json` | `candidates/io.github.bobocha214.opcua.json` |
+| `store/publishers/yuzhi.json` | `publishers/yuzhi.json` |
+| `store/candidates/io.github.yuzhi.opcua.json` | `candidates/io.github.yuzhi.opcua.json` |
 
 PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data access、network access、native sidecar behavior）。
 
@@ -197,9 +197,17 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 
 `connection/connect` 会等到 OPC UA 握手（SecureChannel + `CreateSession`）真正完成才返回成功。此前该调用在握手开始前就返回，紧接着发出的第一条读/写请求会概率性失败于 `BadNotConnected: Unable to send request, transport is not connected`；`opcua/*` 方法现在也会等待会话就绪（自动重连窗口内同样适用），超时设为 10s。
 
+## 安全：TLS 与凭据
+
+- **默认校验证书**。连接表单新增「信任任意服务器证书（不安全）」开关，**默认关闭**。关闭时客户端会按 OPC UA 信任库校验服务器证书（链与主机名）；自签证书的设备需在连接表单里显式勾选该开关，或把服务器证书导入信任库。
+- **不再默认信任任何证书**。早期版本硬编码了 `trust_server_certs(true)`，会接受任意服务器证书且端点安全策略由服务器决定（可能协商到明文 `SecurityPolicy#None`），在「用户名 / 密码」认证下凭据可被中间人截获。0.2.0 起已移除该默认行为。
+- **客户端密钥**。客户端会生成自签的应用实例密钥对，但写入位于系统临时目录（`dbx-opcua-sidecar-pki`），**不会写入插件安装目录**，且每次运行重新生成。
+- **网络直连**。连接会直接连到你填写的 `opc.tcp://主机:端口`（默认 4840），无代理 / 中转之外的外部请求。
+- **写入即下发**。监控表中的数值在回车或移开焦点时立即 `opcua/write` 下发（写后有回读校验）；请确认数值无误再改。
+
 ## 待替换 / 已知限制
 
-- 插件身份：`id` = `io.github.bobocha214.opcua`，`publisher` = `bobocha214`，与 GitHub 账号 `bobocha214` 及仓库 `https://github.com/bobocha214/dbx-plugin-opcua` 一致；`source` / `homepage` 指向该仓库。改动其中任何一项都会改变包内容，需重新打包并重新生成候选元数据。
+- 插件身份：`id` = `io.github.yuzhi.opcua`，`publisher` = `yuzhi`，仓库位于 `https://github.com/bobocha214/dbx-plugin-opcua`（publisher 与 GitHub 账号的显示名一致）。改动 `id` / `publisher` / `version` 中任何一项都会改变包内容，需重新打包并重新生成候选元数据。
 - 许可证：仓库 `LICENSE` 与 `backend/Cargo.toml` 均为 **MIT**，商店条目的 `license` 字段保持一致。
 - 仅 `None` 安全策略；写入仅支持标量类型；未实现订阅与方法调用。
 - 本插件自行实现 JSON-RPC（未使用官方 `dbx-plugin-sdk`），因为 `async-opcua` 需要常驻 tokio runtime 驱动会话事件循环，而 SDK 的 handler 是同步的。协议行为已按 SDK 源码对齐。
@@ -214,7 +222,7 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 {
   "protocolVersion": 1,
   "capabilities": ["connections"],
-  "plugin": { "id": "io.github.bobocha214.opcua", "version": "0.2.0" }
+  "plugin": { "id": "io.github.yuzhi.opcua", "version": "0.2.0" }
 }
 ```
 

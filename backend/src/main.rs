@@ -30,7 +30,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 
 // Must match manifest.json `id` / `version`, otherwise the host rejects the sidecar with
 // "Sidecar identity or protocol does not match manifest".
-const PLUGIN_ID: &str = "io.github.bobocha214.opcua";
+const PLUGIN_ID: &str = "io.github.yuzhi.opcua";
 const PLUGIN_VERSION: &str = "0.2.0";
 const PROTOCOL_VERSION: u32 = 1;
 
@@ -56,6 +56,49 @@ struct ConnectionFields {
     /// Sensitive fields declared with `"binding": "secret"` may arrive under `secret`.
     #[serde(default)]
     secret: Option<String>,
+    /// When true the client accepts ANY server certificate (no chain / hostname check).
+    /// Off by default. Comes from the connection form's `trust_insecure` boolean field,
+    /// which the host forwards under `external_config` (or `config`).
+    #[serde(default)]
+    trust_insecure: bool,
+}
+
+/// Where to keep the OPC UA client's PKI material (application-instance key pair and the
+/// server-trust store). We point it at a throwaway directory under the system temp dir
+/// rather than the package directory, so the self-signed client key is never written
+/// inside the installed plugin and does not survive between runs.
+fn pki_dir() -> std::path::PathBuf {
+    std::env::temp_dir().join("dbx-opcua-sidecar-pki")
+}
+
+/// Deserialize a connection request into `ConnectionFields`, resolving the
+/// `trust_insecure` flag from wherever the host placed the `boolean` config field
+/// (`external_config`, `config`, or a top-level key — the host's forwarding layout has
+/// shifted between versions).
+fn connection_from(params: &Value) -> Result<ConnectionFields, String> {
+    let conn_val = params
+        .get("connection")
+        .cloned()
+        .unwrap_or_else(|| params.clone());
+    let mut conn: ConnectionFields =
+        serde_json::from_value(conn_val.clone()).map_err(|e| format!("Invalid connection params: {}", e))?;
+    conn.trust_insecure = conn_val
+        .get("trust_insecure")
+        .and_then(|v| v.as_bool())
+        .or_else(|| {
+            conn_val
+                .get("external_config")
+                .and_then(|e| e.get("trust_insecure"))
+                .and_then(|v| v.as_bool())
+        })
+        .or_else(|| {
+            conn_val
+                .get("config")
+                .and_then(|e| e.get("trust_insecure"))
+                .and_then(|v| v.as_bool())
+        })
+        .unwrap_or(false);
+    Ok(conn)
 }
 
 fn log_err(msg: String) {
@@ -83,12 +126,27 @@ fn identity_for(conn: &ConnectionFields) -> IdentityToken {
 /// Establish a session, returning it (and the event-loop handle) without storing it.
 async fn open_session(conn: &ConnectionFields) -> Result<(Arc<Session>, tokio::task::JoinHandle<StatusCode>), String> {
     let url = endpoint_url(conn);
-    let mut client = ClientBuilder::new()
+    // Default: verify the server certificate against the (ephemeral) trust store. The
+    // user must explicitly opt into `trust_server_certs` from the connection form for
+    // endpoints that present a self-signed certificate, because accepting any certificate
+    // with username/password auth lets a MITM impersonate the server and capture creds.
+    let mut builder = ClientBuilder::new()
         .application_name("dbx-opcua-sidecar")
         .application_uri("urn:dbx:opcua-sidecar")
+        .pki_dir(pki_dir())
         .create_sample_keypair(true)
-        .trust_server_certs(true)
-        .session_retry_limit(0) // fail fast on a bad endpoint
+        .session_retry_limit(0); // fail fast on a bad endpoint
+    if conn.trust_insecure {
+        log_err(
+            "SECURITY: 'trust any server certificate' is enabled for this connection — \
+             the client will accept any server certificate without verifying its chain or \
+             hostname. Combined with username/password auth this exposes credentials to a \
+             man-in-the-middle. Only use it on an isolated, trusted network."
+                .to_string(),
+        );
+        builder = builder.trust_server_certs(true);
+    }
+    let mut client = builder
         .client()
         .map_err(|e| format!("Failed to build OPC UA client: {:?}", e))?;
 
@@ -434,10 +492,7 @@ fn handle_initialize(params: &Value) -> Result<Value, String> {
 }
 
 async fn handle_test(params: &Value, _sessions: &Sessions) -> Result<Value, String> {
-    let conn: ConnectionFields = serde_json::from_value(
-        params.get("connection").cloned().unwrap_or_else(|| params.clone()),
-    )
-    .map_err(|e| format!("Invalid connection params: {}", e))?;
+    let conn = connection_from(params)?;
     let url = endpoint_url(&conn);
     let (session, handle) = open_session(&conn).await?;
     // Probe with a root browse to confirm the session is usable.
@@ -464,10 +519,7 @@ async fn handle_test(params: &Value, _sessions: &Sessions) -> Result<Value, Stri
 }
 
 async fn handle_connect(params: &Value, sessions: &Sessions) -> Result<Value, String> {
-    let conn: ConnectionFields = serde_json::from_value(
-        params.get("connection").cloned().unwrap_or_else(|| params.clone()),
-    )
-    .map_err(|e| format!("Invalid connection params: {}", e))?;
+    let conn = connection_from(params)?;
     let url = endpoint_url(&conn);
     // If already connected, drop the previous session first.
     {

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.yuzhi.opcua",
+  "publisher": "yuzhi",
+  "version": "0.2.0",
+  "name": "OPC UA",
+  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values with data type aware decoding.",
+  "icon": "https://raw.githubusercontent.com/bobocha214/dbx-plugin-opcua/v0.2.0/assets/plugin.svg",
+  "tags": [
+    "opcua",
+    "opc-ua",
+    "plc",
+    "industrial",
+    "iot",
+    "scada"
+  ],
+  "permissions": [
+    "host.connections:read",
+    "host.workbench"
+  ],
+  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.0",
+  "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
+  "license": "MIT",
+  "releaseNotes": "0.2.0: version update of the existing io.github.yuzhi.opcua (publisher yuzhi) -- your 0.1.0 connection carries over. Security: server certificates are now verified by default; a per-connection 'trust any certificate (insecure)' toggle replaces the previous always-on trust, so username/password auth is no longer exposed to a man-in-the-middle by default. The package now bundles LICENSE (MIT) and a THIRD-PARTY notice covering the MPL-2.0 static dependencies (async-opcua 0.19). Three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes wait for the session handshake, resolve the node DataType server-side, report the OPC UA status code on failure and read the value back. Editing a watched value and pressing Enter (or blurring) writes it immediately.",
+  "localizations": {
+    "zh-CN": {
+      "name": "OPC UA",
+      "description": "浏览 PLC 和 OPC UA 服务器的地址空间，按数据类型读取并写入节点值。"
+    }
+  },
+  "targets": []
+}

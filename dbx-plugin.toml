@@ -6,4 +6,4 @@ directory = "backend"
 binary = "dbx-plugin-opcua"
 
 [package]
-include = ["assets", "ui"]
+include = ["assets", "ui", "LICENSE", "THIRD-PARTY"]

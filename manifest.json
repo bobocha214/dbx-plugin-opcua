@@ -1,12 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
   "manifest_version": 1,
-  "id": "io.github.bobocha214.opcua",
+  "id": "io.github.yuzhi.opcua",
   "name": "OPC UA",
   "version": "0.2.0",
-  "publisher": "bobocha214",
-  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values.",
-  "source": "https://github.com/bobocha214/dbx-plugin-opcua",
+  "publisher": "yuzhi",
+  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values. Connects directly to the opc.tcp://host:port you enter (default 4840). Server certificates are verified by default; only enable 'trust any certificate' on an isolated network. Editing a watched value and pressing Enter (or moving focus) writes it immediately.",
+  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.0",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "icon": "assets/plugin.svg",
   "engines": {
@@ -33,7 +33,7 @@
   "contributions": [
     {
       "type": "connection-provider",
-      "id": "io.github.bobocha214.opcua.connection",
+      "id": "io.github.yuzhi.opcua.connection",
       "label": "OPC UA",
       "icon": "assets/connection.svg",
       "database_type": "opcua",
@@ -74,6 +74,14 @@
           "label": "Password",
           "type": "password",
           "binding": "secret"
+        },
+        {
+          "key": "trust_insecure",
+          "label": "Trust any server certificate (insecure)",
+          "type": "boolean",
+          "default": false,
+          "binding": "config",
+          "description": "Off by default. When on, the client accepts any server certificate without verifying its chain or hostname. Only enable this for an isolated, trusted network — with username/password auth a man-in-the-middle could impersonate the server and capture your credentials."
         }
       ],
       "workbench": "io.github.bobocha214.opcua.workbench",
@@ -81,7 +89,7 @@
     },
     {
       "type": "workbench",
-      "id": "io.github.bobocha214.opcua.workbench",
+      "id": "io.github.yuzhi.opcua.workbench",
       "label": "OPC UA browser",
       "description": "Browse the OPC UA address space, then read and write node values.",
       "icon": "assets/plugin.svg"
@@ -90,9 +98,9 @@
   "localizations": {
     "zh-CN": {
       "name": "OPC UA",
-      "description": "OPC UA 客户端读写插件：连接 PLC/服务器，浏览地址空间，读取与写入节点值。",
+      "description": "OPC UA 客户端读写插件：连接 PLC/服务器，浏览地址空间，读取与写入节点值。会直连你填写的 opc.tcp://主机:端口（默认 4840）；默认校验证书，仅在内网等可信环境才勾选“信任任意证书”；修改监视值后回车或移开焦点即下发写入。",
       "contributions": {
-        "io.github.bobocha214.opcua.connection": {
+        "io.github.yuzhi.opcua.connection": {
           "label": "OPC UA 连接",
           "description": "连接到 OPC UA 服务器 / PLC。",
           "fields": {
@@ -100,10 +108,11 @@
             "endpoint": { "label": "主机" },
             "port": { "label": "端口" },
             "username": { "label": "用户名" },
-            "password": { "label": "密码" }
+            "password": { "label": "密码" },
+            "trust_insecure": { "label": "信任任意服务器证书（不安全）" }
           }
         },
-        "io.github.bobocha214.opcua.workbench": {
+        "io.github.yuzhi.opcua.workbench": {
           "label": "OPC UA 浏览器",
           "description": "浏览 OPC UA 地址空间，读取与写入节点值。"
         }
