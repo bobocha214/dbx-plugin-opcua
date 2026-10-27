@@ -31,7 +31,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 // Must match manifest.json `id` / `version`, otherwise the host rejects the sidecar with
 // "Sidecar identity or protocol does not match manifest".
 const PLUGIN_ID: &str = "io.github.yuzhi.opcua";
-const PLUGIN_VERSION: &str = "0.2.0";
+const PLUGIN_VERSION: &str = "0.2.1";
 const PROTOCOL_VERSION: u32 = 1;
 
 /// A live OPC UA session plus the task that drives its event loop.
