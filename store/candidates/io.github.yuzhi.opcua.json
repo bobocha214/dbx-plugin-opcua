@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.yuzhi.opcua",
   "publisher": "yuzhi",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "name": "OPC UA",
-  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values with data type aware decoding.",
-  "icon": "https://raw.githubusercontent.com/bobocha214/dbx-plugin-opcua/v0.2.0/assets/plugin.svg",
+  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values with data type aware decoding. Connects directly to the opc.tcp://host:port you enter (default 4840); server certificates are verified by default.",
+  "icon": "https://raw.githubusercontent.com/bobocha214/dbx-plugin-opcua/v0.2.1/assets/plugin.svg",
   "tags": [
     "opcua",
     "opc-ua",
@@ -18,15 +18,46 @@
     "host.connections:read",
     "host.workbench"
   ],
-  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.0",
+  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.1",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "license": "MIT",
-  "releaseNotes": "0.2.0: version update of the existing io.github.yuzhi.opcua (publisher yuzhi) -- your 0.1.0 connection carries over. Security: server certificates are now verified by default; a per-connection 'trust any certificate (insecure)' toggle replaces the previous always-on trust, so username/password auth is no longer exposed to a man-in-the-middle by default. The package now bundles LICENSE (MIT) and a THIRD-PARTY notice covering the MPL-2.0 static dependencies (async-opcua 0.19). Three-column workbench with draggable splitters; Variable points can be dragged onto the board; writes wait for the session handshake, resolve the node DataType server-side, report the OPC UA status code on failure and read the value back. Editing a watched value and pressing Enter (or blurring) writes it immediately.",
+  "releaseNotes": "v0.2.1 更新说明：\n- 修复插件不兼容报错：连接贡献点引用的 workbench 已更正为 io.github.yuzhi.opcua.workbench，加载时不再报 “references missing workbench”。\n- 连接表单中文化：「信任任意服务器证书（不安全）」开关的标签与说明已全部改为中文。\n- 安全：默认校验服务器证书；仅当用户在可信内网等环境主动勾选该开关时，才放行自签名 / 任意证书（用于连接自签 PLC）。\n- 许可证：安装包内已包含 LICENSE（MIT）与 THIRD-PARTY（MPL-2.0 第三方声明，因静态链接 async-opcua 0.19）。\n- 写入行为：在监视面板里直接改值，回车或失焦即下发到服务器，并回读比对。\n- 升级提示：从 0.1.0 升级无需重新添加连接；若曾安装早期 bobocha214 命名空间的包，请删除旧连接后重新添加（身份不同，连接不共享）。",
   "localizations": {
     "zh-CN": {
       "name": "OPC UA",
       "description": "浏览 PLC 和 OPC UA 服务器的地址空间，按数据类型读取并写入节点值。"
     }
   },
-  "targets": []
+  "targets": [
+    {
+      "target": "darwin-arm64",
+      "sha256": "f73ae86c176cd1dd573b60ca679360084386ec774511e37373fca54601619cef",
+      "size": 2401580,
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.1/io.github.yuzhi.opcua-0.2.1-darwin-arm64.dbxp"
+    },
+    {
+      "target": "darwin-x64",
+      "sha256": "6eed2d8872d9e0c8a5343971a2e4112905750451e045c1b898361e68bae4f727",
+      "size": 2530268,
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.1/io.github.yuzhi.opcua-0.2.1-darwin-x64.dbxp"
+    },
+    {
+      "target": "linux-arm64",
+      "sha256": "f41a375c69db7770bfcb58917afcb14f4f92e93c842082c1f30dde80af71975d",
+      "size": 2538562,
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.1/io.github.yuzhi.opcua-0.2.1-linux-arm64.dbxp"
+    },
+    {
+      "target": "linux-x64",
+      "sha256": "0d677dd050500ac4392b0331a75ed8d72a3487d0e243d694688253df299233ad",
+      "size": 2654907,
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.1/io.github.yuzhi.opcua-0.2.1-linux-x64.dbxp"
+    },
+    {
+      "target": "windows-x64",
+      "sha256": "04e9d740ce7fa7872ca4ff9c5954dddadcd75f0ab974aeb8242876e377fbd787",
+      "size": 2668520,
+      "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.1/io.github.yuzhi.opcua-0.2.1-windows-x64.dbxp"
+    }
+  ]
 }
