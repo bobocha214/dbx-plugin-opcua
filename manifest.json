@@ -84,7 +84,7 @@
           "description": "Off by default. When on, the client accepts any server certificate without verifying its chain or hostname. Only enable this for an isolated, trusted network — with username/password auth a man-in-the-middle could impersonate the server and capture your credentials."
         }
       ],
-      "workbench": "io.github.bobocha214.opcua.workbench",
+      "workbench": "io.github.yuzhi.opcua.workbench",
       "capabilities": ["test", "connect", "disconnect"]
     },
     {
