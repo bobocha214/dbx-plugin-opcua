@@ -77,11 +77,11 @@
         },
         {
           "key": "trust_insecure",
-          "label": "Trust any server certificate (insecure)",
+          "label": "信任任意服务器证书（不安全）",
           "type": "boolean",
           "default": false,
           "binding": "config",
-          "description": "Off by default. When on, the client accepts any server certificate without verifying its chain or hostname. Only enable this for an isolated, trusted network — with username/password auth a man-in-the-middle could impersonate the server and capture your credentials."
+          "description": "默认关闭。开启后会接受任何服务器证书、不再校验其证书链与主机名，仅建议在内网等可信环境勾选——若使用用户名/密码认证，开启后中间人可能冒充服务器并窃取凭据。"
         }
       ],
       "workbench": "io.github.yuzhi.opcua.workbench",
@@ -109,7 +109,7 @@
             "port": { "label": "端口" },
             "username": { "label": "用户名" },
             "password": { "label": "密码" },
-            "trust_insecure": { "label": "信任任意服务器证书（不安全）" }
+            "trust_insecure": { "label": "信任任意服务器证书（不安全）", "description": "默认关闭。开启后会接受任何服务器证书、不再校验其证书链与主机名，仅建议在内网等可信环境勾选——若使用用户名/密码认证，开启后中间人可能冒充服务器并窃取凭据。" }
           }
         },
         "io.github.yuzhi.opcua.workbench": {
