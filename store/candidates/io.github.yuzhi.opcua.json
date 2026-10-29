@@ -32,32 +32,32 @@
     {
       "target": "darwin-arm64",
       "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.2/io.github.yuzhi.opcua-0.2.2-darwin-arm64.dbxp",
-      "sha256": "bd8f50206fc06684a5d7b713433037d4e9f8cc6207f696182c585ff6faf4435b",
-      "size": 2463676
+      "sha256": "978e012c7b1399cbab090b9d4221da0b4acc9ac2571802b1ce0341ee725a9a1f",
+      "size": 2463696
     },
     {
       "target": "darwin-x64",
       "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.2/io.github.yuzhi.opcua-0.2.2-darwin-x64.dbxp",
-      "sha256": "b7b9cedc7a7493607be06eca47fc4813b4bec9b44b8940696b7d9e60910d8a30",
-      "size": 2592028
+      "sha256": "9cdf9ef0ba45eaf4698d2645a1e399e5be424a2b5399e618751e79ac59a4fcf9",
+      "size": 2592034
     },
     {
       "target": "linux-arm64",
       "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.2/io.github.yuzhi.opcua-0.2.2-linux-arm64.dbxp",
-      "sha256": "1dfc0606e1954e73fd421cede14839578ce41699f382e9189a93b42a743add80",
-      "size": 2600466
+      "sha256": "883cfdb2e789e1326d91c61b5166209b6dc19b61b94dfaa7079e5aea5bef4845",
+      "size": 2600492
     },
     {
       "target": "linux-x64",
       "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.2/io.github.yuzhi.opcua-0.2.2-linux-x64.dbxp",
-      "sha256": "11642a0b84e1ce442ee9959dec546fa5cba6141feff8bc1c2a03763e16e1b89e",
-      "size": 2716689
+      "sha256": "ce7b80f111f6ee91a029bf2a6832d0c841d834155097d60924d0fabe67504ddd",
+      "size": 2716610
     },
     {
       "target": "windows-x64",
       "url": "https://github.com/bobocha214/dbx-plugin-opcua/releases/download/v0.2.2/io.github.yuzhi.opcua-0.2.2-windows-x64.dbxp",
-      "sha256": "643cde31546c7c4030a6e23f85478463734585436e2840ba68f244e1b091fd80",
-      "size": 2729817
+      "sha256": "3777aca1c85e6da0796ef3e162f4f0a666448eb3cec0a0c574bd9af0845f51ec",
+      "size": 2729897
     }
   ]
 }
