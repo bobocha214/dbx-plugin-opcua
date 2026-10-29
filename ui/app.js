@@ -48,11 +48,12 @@
     watchEls: {},    // nodeId -> { row, v, dt }
     lasts: {},       // nodeId -> last read result (also for points not in the watch list)
     selected: "",    // nodeId currently shown in the right-hand detail pane
-    dragNodeId: "",  // nodeId being dragged out of the tree
     dtDirty: false,  // user picked a write data type by hand -> stop auto-following
     polling: false,
     tickBusy: false,
     timer: null,
+    editingNodeId: "", // point whose inline write row is open in the board
+    suppressClick: false, // swallow the click that follows a custom drag
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -64,11 +65,38 @@
   var layoutEl = $("layout");
   var treePane = $("treePane");
   var detailPane = $("detailPane");
+  var connPanel = $("connPanel");
 
   function setStatus(text, cls) {
     var el = $("status");
     el.textContent = text;
     el.className = "status" + (cls ? " " + cls : "");
+  }
+
+  // The top bar is a status strip: it names the connection the host gave us
+  // instead of asking the user to pick one on every load.
+  function setConnLabel(text, title) {
+    var el = $("connName");
+    if (!el) return;
+    el.textContent = text || "未选择连接";
+    el.title = title || text || "未选择连接";
+  }
+
+  function openConnPanel(open) {
+    if (!connPanel) return;
+    var on = open === undefined ? connPanel.classList.contains("hidden") : !!open;
+    connPanel.classList.toggle("hidden", !on);
+    var btn = $("connToggle");
+    if (btn) btn.setAttribute("aria-expanded", on ? "true" : "false");
+    if (on) {
+      var sel = $("connSelect");
+      if (sel) sel.focus();
+    }
+  }
+
+  function shortId(id) {
+    if (!id) return "";
+    return id.length > 14 ? id.slice(0, 12) + "…" : id;
   }
 
   function toast(t, isErr) {
@@ -190,7 +218,10 @@
     renderWatch();
 
     var label = known ? (known.name || known.label || id) : id;
-    setStatus("已选择 " + label, "ok");
+    setConnLabel(label + " · " + shortId(id), id);
+    var live = known && (known.connected || known.isConnected);
+    setStatus(live ? "已连接" : "已选择", "ok");
+    openConnPanel(false);
     await loadRoots();
     if (state.polling) startPolling();
   }
@@ -221,22 +252,15 @@
     row.className = "node-row";
     row.dataset.nodeId = node.nodeId;
 
-    // Points are dragged from the tree into the middle board. Every node is
-    // draggable so the gesture always starts; the drop handler accepts only
-    // Variables and explains why anything else was rejected.
-    row.draggable = true;
-    row.addEventListener("dragstart", function (ev) {
-      state.dragNodeId = node.nodeId;
-      row.classList.add("dragging");
-      if (ev.dataTransfer) {
-        ev.dataTransfer.effectAllowed = "copy";
-        try { ev.dataTransfer.setData("text/plain", node.nodeId); } catch (e) { /* ignore */ }
-      }
-    });
-    row.addEventListener("dragend", function () {
-      state.dragNodeId = "";
-      row.classList.remove("dragging");
-    });
+    // Points are dragged from the tree into the middle board.
+    //
+    // Native HTML5 drag is deliberately DISABLED here. With draggable=true,
+    // Chromium starts a native drag a few pixels into the gesture; that fires
+    // `pointercancel`, which aborts the pointer drag below, and in several host
+    // webviews (WebView2 among them) the matching `drop` never arrives either —
+    // so the point silently lands nowhere. Pointer events work everywhere, so
+    // they are the only drag channel now.
+    row.draggable = false;
 
     var tw = document.createElement("span");
     tw.className = "twisty";
@@ -273,8 +297,29 @@
       row.appendChild(add);
     }
 
+    // Dragging out of the tree is the primary way to add a point. Native HTML5
+    // DnD is unreliable (and in some host webviews disabled outright), so rows
+    // also start a pointer-based drag that always works.
+    row.dataset.dragLabel = node.displayName || node.browseName || node.nodeId;
+    row.addEventListener(EV_DOWN, function (ev) {
+      if (ev.button !== 0) return;
+      if (ev.target && ev.target.closest && ev.target.closest(".watch-add, .twisty")) return;
+      startPointerDrag(ev, node.nodeId, row);
+    });
+
+    // Keyboard/mouse alternative to dragging: double click adds a Variable.
+    row.addEventListener("dblclick", function (ev) {
+      ev.stopPropagation();
+      if (node.nodeClass === "Variable") { addWatch(node); return; }
+      toggleExpand(node.nodeId);
+    });
+
     row.addEventListener("click", function (ev) {
       ev.stopPropagation();
+      // The second click of a double click is handled by the dblclick handler.
+      if (ev.detail > 1) return;
+      // A drag ends with a click on the row it started from — ignore that one.
+      if (state.suppressClick) { state.suppressClick = false; return; }
       selectNode(node.nodeId);
       toggleExpand(node.nodeId);
     });
@@ -339,7 +384,10 @@
 
     Object.keys(state.watchEls).forEach(function (id) {
       var el = state.watchEls[id];
-      if (el && el.row) el.row.classList.toggle("selected", id === nodeId);
+      if (!el) return;
+      var on = id === nodeId;
+      if (el.card) el.card.classList.toggle("selected", on);
+      if (el.row) el.row.classList.toggle("selected", on);
     });
   }
 
@@ -428,11 +476,13 @@
     html += '<div class="section-label">写入</div>';
     html +=
       '<div class="write-form">' +
-      '<select id="dt">' + dtypeOptions(lastDt(nodeId)) + "</select>" +
-      '<input id="wv" type="text" placeholder="值" />' +
-      '<button id="writeBtn">写入</button>' +
+      '<div class="wf-row"><span class="wf-lbl">类型</span>' +
+      '<select id="dt">' + dtypeOptions(lastDt(nodeId)) + "</select></div>" +
+      '<input id="wv" type="text" placeholder="要写入的值" spellcheck="false" />' +
+      '<div class="wf-row"><button id="writeBtn">写入</button>' +
+      '<div id="writeRes" class="hint"></div></div>' +
       "</div>";
-    html += '<div id="writeRes" class="hint" style="margin-top:8px;"></div>';
+    html += '<p class="hint" style="margin:8px 0 0;">点击「写入」才下发；点位区卡片内也可就地改值。</p>';
     detail.innerHTML = html;
 
     $("watchBtn").addEventListener("click", function () {
@@ -519,11 +569,13 @@
   async function writeValue(nodeId) {
     var sel = $("dt");
     var inp = $("wv");
+    var btn = $("writeBtn");
     if (!sel || !inp) return;
     var dt = sel.value;
     var raw = inp.value;
     var before = readValueText(nodeId);
 
+    if (btn) { btn.disabled = true; btn.textContent = "写入中…"; }
     setWriteRes("写入中…", "var(--muted)");
     var res;
     try {
@@ -537,16 +589,19 @@
     } catch (e) {
       setWriteRes("写入失败：" + msg(e), "var(--err)");
       toast("写入失败：" + msg(e), true);
+      if (btn) { btn.disabled = false; btn.textContent = "写入"; }
       return;
     }
 
     if (res.success === false) {
       setWriteRes("写入失败：" + writeFailText(res), "var(--err)");
       toast("写入失败：" + writeFailText(res), true);
+      if (btn) { btn.disabled = false; btn.textContent = "写入"; }
       return;
     }
 
     var usedType = res.dataType || dt;
+    if (btn) { btn.disabled = false; btn.textContent = "写入"; }
     setWriteRes("写入成功 · 类型 " + usedType + " · 状态 " + (res.status || "Good"), "var(--ok)");
     toast("已写入 " + nodeId + " = " + raw);
 
@@ -564,58 +619,104 @@
   }
 
   // ----------------------------------------------------------------------
-  // Drag & drop — points are dragged out of the tree into the middle board
+  // Drag & drop — points are dragged out of the tree into the middle board.
+  // Pointer events only; see the note on `row.draggable` above for why.
   // ----------------------------------------------------------------------
-  function draggedNodeId(ev) {
-    var nodeId = state.dragNodeId;
-    if (!nodeId && ev.dataTransfer) {
-      try { nodeId = ev.dataTransfer.getData("text/plain"); } catch (e) { nodeId = ""; }
-    }
-    return nodeId;
+
+  // Which pane is under the cursor — the board accepts points, the detail pane
+  // only shows them. Hit-testing uses the pane rectangles rather than
+  // elementFromPoint so an overlay (or the drag ghost) can never hide a target.
+  function inRect(el, x, y) {
+    if (!el) return false;
+    var r = el.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
   }
 
-  function bindDrop() {
-    boardPane.addEventListener("dragover", function (ev) {
-      ev.preventDefault(); // required, or the drop event never fires
-      if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
-      boardPane.classList.add("drop-active");
-    });
-    boardPane.addEventListener("dragleave", function (ev) {
-      if (!boardPane.contains(ev.relatedTarget)) boardPane.classList.remove("drop-active");
-    });
-    boardPane.addEventListener("drop", function (ev) {
-      ev.preventDefault();
-      boardPane.classList.remove("drop-active");
+  function dropTargetAt(x, y) {
+    if (inRect(boardPane, x, y)) return "board";
+    if (inRect(detailPane, x, y)) return "detail";
+    return null;
+  }
 
-      var nodeId = draggedNodeId(ev);
-      if (!nodeId) return;
+  function highlightDropTarget(target) {
+    if (boardPane) boardPane.classList.toggle("drop-active", target === "board");
+    if (detailPane) detailPane.classList.toggle("drop-active", target === "detail");
+  }
 
-      var node = state.nodes[nodeId] ? state.nodes[nodeId].data : null;
-      if (node && node.nodeClass && node.nodeClass !== "Variable") {
-        toast("只能拖入 Variable 点位（" + node.nodeClass + " 不可读取/写入）", true);
-        return;
-      }
-      addWatch(node || { nodeId: nodeId, displayName: nodeId, nodeClass: "Variable" });
-    });
-
-    // Dropping on the detail pane means "show me this point" — no need to hunt for the
-    // tree row again after a drag.
-    if (detailPane) {
-      detailPane.addEventListener("dragover", function (ev) {
-        ev.preventDefault();
-        if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
-        detailPane.classList.add("drop-active");
-      });
-      detailPane.addEventListener("dragleave", function (ev) {
-        if (!detailPane.contains(ev.relatedTarget)) detailPane.classList.remove("drop-active");
-      });
-      detailPane.addEventListener("drop", function (ev) {
-        ev.preventDefault();
-        detailPane.classList.remove("drop-active");
-        var nodeId = draggedNodeId(ev);
-        if (nodeId) selectNode(nodeId);
-      });
+  // Shared by both drag implementations: accept Variables, explain anything else.
+  function dropNodeOnBoard(nodeId) {
+    if (!nodeId) return;
+    var node = state.nodes[nodeId] ? state.nodes[nodeId].data : null;
+    if (node && node.nodeClass && node.nodeClass !== "Variable") {
+      toast("只能拖入 Variable 点位（" + node.nodeClass + " 不可读取/写入）", true);
+      return;
     }
+    addWatch(node || { nodeId: nodeId, displayName: nodeId, nodeClass: "Variable" });
+  }
+
+  // Pointer-based drag: works even where the host webview swallows native DnD.
+  var DRAG_THRESHOLD = 5;
+
+  // Every Chromium/Edge webview has pointer events; the mouse fallback only
+  // matters for hosts that do not, and the two never run at the same time.
+  var HAS_POINTER = typeof window.PointerEvent === "function";
+  var EV_DOWN = HAS_POINTER ? "pointerdown" : "mousedown";
+  var EV_MOVE = HAS_POINTER ? "pointermove" : "mousemove";
+  var EV_UP = HAS_POINTER ? "pointerup" : "mouseup";
+  var EV_CANCEL = HAS_POINTER ? "pointercancel" : null;
+
+  function startPointerDrag(ev, nodeId, row) {
+    var startX = ev.clientX;
+    var startY = ev.clientY;
+    var ghost = null;
+    var active = false;
+
+    function onMove(e) {
+      if (!active) {
+        if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) < DRAG_THRESHOLD) return;
+        active = true;
+        document.body.classList.add("dnd-active");
+        row.classList.add("drag-src");
+        ghost = document.createElement("div");
+        ghost.className = "drag-ghost";
+        ghost.textContent = row.dataset.dragLabel || nodeId;
+        document.body.appendChild(ghost);
+      }
+      ghost.style.left = e.clientX + 14 + "px";
+      ghost.style.top = e.clientY + 12 + "px";
+      highlightDropTarget(dropTargetAt(e.clientX, e.clientY));
+    }
+
+    function cleanup() {
+      document.removeEventListener(EV_MOVE, onMove);
+      document.removeEventListener(EV_UP, onUp);
+      if (EV_CANCEL) document.removeEventListener(EV_CANCEL, onCancel);
+      if (!active) return;
+      active = false;
+      document.body.classList.remove("dnd-active");
+      row.classList.remove("drag-src");
+      if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      highlightDropTarget(null);
+    }
+
+    function onUp(e) {
+      var wasActive = active;
+      cleanup();
+      if (!wasActive) return;
+      // The click event that follows the drag must not select/expand the row.
+      state.suppressClick = true;
+      setTimeout(function () { state.suppressClick = false; }, 300);
+
+      var target = dropTargetAt(e.clientX, e.clientY);
+      if (target === "board") dropNodeOnBoard(nodeId);
+      else if (target === "detail") selectNode(nodeId);
+    }
+
+    function onCancel() { cleanup(); }
+
+    document.addEventListener(EV_MOVE, onMove);
+    document.addEventListener(EV_UP, onUp);
+    if (EV_CANCEL) document.addEventListener(EV_CANCEL, onCancel);
   }
 
   // ----------------------------------------------------------------------
@@ -794,6 +895,7 @@
 
   function removeWatch(nodeId) {
     state.watch = state.watch.filter(function (i) { return i.nodeId !== nodeId; });
+    if (state.editingNodeId === nodeId) state.editingNodeId = "";
     saveWatch();
     renderWatch();
     syncWatchButtons();
@@ -815,16 +917,22 @@
   function renderWatch() {
     watchList.innerHTML = "";
     state.watchEls = {};
+    // Rebuilding closes every write row, so drop the "open editor" marker.
+    state.editingNodeId = "";
     var count = $("watchCount");
     if (count) count.textContent = String(state.watch.length);
 
     // The empty state lives outside the list so it can double as the drop hint.
     dropHint.classList.toggle("hidden", state.watch.length > 0);
-    if (!state.watch.length) return;
+    if (!state.watch.length) { state.editingNodeId = ""; return; }
 
     state.watch.forEach(function (item) {
+      var card = document.createElement("div");
+      card.className = "watch-card" + (state.selected === item.nodeId ? " selected" : "");
+      card.dataset.nodeId = item.nodeId;
+
       var row = document.createElement("div");
-      row.className = "watch-item" + (state.selected === item.nodeId ? " selected" : "");
+      row.className = "watch-item";
       row.dataset.nodeId = item.nodeId;
       // Clicking a card selects the point -> its details show in the right column.
       row.addEventListener("click", function () { selectNode(item.nodeId); });
@@ -848,7 +956,7 @@
       var v = document.createElement("span");
       v.className = "wi-v stale";
       v.textContent = fmtValue(item.value);
-      v.title = "点击直接修改，回车下发写入";
+      v.title = "点击就地改值，改完点「写入」下发";
       v.addEventListener("click", function (ev) { ev.stopPropagation(); beginEdit(item.nodeId); });
 
       var dt = document.createElement("span");
@@ -858,6 +966,12 @@
       valWrap.appendChild(v);
       valWrap.appendChild(dt);
 
+      var edit = document.createElement("button");
+      edit.className = "wi-edit-btn";
+      edit.textContent = "✎";
+      edit.title = "就地改值并写入";
+      edit.addEventListener("click", function (ev) { ev.stopPropagation(); beginEdit(item.nodeId); });
+
       var del = document.createElement("button");
       del.className = "wi-del";
       del.textContent = "×";
@@ -866,17 +980,67 @@
 
       row.appendChild(main);
       row.appendChild(valWrap);
+      row.appendChild(edit);
       row.appendChild(del);
-      watchList.appendChild(row);
 
-      state.watchEls[item.nodeId] = { row: row, v: v, dt: dt };
+      // Inline write row: opened on demand, and only the 写入 button sends it.
+      var write = document.createElement("div");
+      write.className = "wi-write hidden";
+
+      var input = document.createElement("input");
+      input.className = "wi-input";
+      input.type = "text";
+      input.placeholder = "写入值";
+      input.spellcheck = false;
+
+      var dtSel = document.createElement("select");
+      dtSel.className = "wi-dt-sel";
+      dtSel.innerHTML = dtypeOptions("");
+      dtSel.title = "写入数据类型，默认按服务器类型";
+
+      var wBtn = document.createElement("button");
+      wBtn.className = "wi-btn";
+      wBtn.textContent = "写入";
+
+      var cBtn = document.createElement("button");
+      cBtn.className = "wi-btn ghost";
+      cBtn.textContent = "取消";
+
+      var note = document.createElement("div");
+      note.className = "wi-write-note";
+      note.textContent = "点击「写入」才下发到设备；Esc 取消。";
+
+      write.appendChild(input);
+      write.appendChild(dtSel);
+      write.appendChild(wBtn);
+      write.appendChild(cBtn);
+      write.appendChild(note);
+
+      wBtn.addEventListener("click", function (ev) { ev.stopPropagation(); commitEdit(item.nodeId); });
+      cBtn.addEventListener("click", function (ev) { ev.stopPropagation(); cancelEdit(item.nodeId); });
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); commitEdit(item.nodeId); }
+        else if (e.key === "Escape") { e.preventDefault(); cancelEdit(item.nodeId); }
+      });
+      // Clicking inside the write row must not re-select / collapse anything.
+      write.addEventListener("click", function (ev) { ev.stopPropagation(); });
+
+      card.appendChild(row);
+      card.appendChild(write);
+      watchList.appendChild(card);
+
+      state.watchEls[item.nodeId] = {
+        card: card, row: row, v: v, dt: dt,
+        write: write, input: input, dtSel: dtSel, wBtn: wBtn, note: note,
+      };
     });
   }
 
   // Repaint one board cell from the freshest data we have for that node.
   function paintItem(nodeId) {
     var el = state.watchEls[nodeId];
-    if (!el || el.v.classList.contains("editing")) return;
+    // Never fight the user: an open write row keeps what they typed.
+    if (!el || state.editingNodeId === nodeId) return;
     var item = findItem(nodeId);
     var last = state.lasts[nodeId] || {};
     var status = (item && item.status) || last.status || "";
@@ -889,7 +1053,7 @@
       name +
       (status ? " · 状态: " + status : "") +
       (ts ? " · 时间: " + ts : "") +
-      "\n点击直接修改，回车下发写入";
+      "\n点击就地改值，改完点「写入」下发";
   }
 
   function applyValues(values) {
@@ -915,47 +1079,59 @@
     setTimeout(function () { el.v.classList.remove("flash-ok", "flash-err"); }, 700);
   }
 
-  // Click the value -> it becomes a selected input; Enter (or blur) writes it down.
+  // Open the inline write row of a board card. Nothing is sent until the user
+  // presses 写入 — losing focus no longer writes, which is what used to fire
+  // accidental writes when a poll or a click stole focus mid-edit.
   function beginEdit(nodeId) {
     var item = findItem(nodeId);
-    var el = state.watchEls[nodeId] && state.watchEls[nodeId].v;
-    if (!item || !el || el.classList.contains("editing")) return;
+    var el = state.watchEls[nodeId];
+    if (!item || !el) return;
+    if (state.editingNodeId && state.editingNodeId !== nodeId) cancelEdit(state.editingNodeId);
+    if (state.editingNodeId === nodeId) { el.input.focus(); el.input.select(); return; }
 
     var current = item.value === null || item.value === undefined ? "" : String(item.value);
+    el.input.value = current;
+    var dt = item.dataType && WRITE_TYPES.indexOf(item.dataType) >= 0 ? item.dataType : "Auto";
+    el.dtSel.value = dt;
+    el.note.textContent = "点击「写入」才下发到设备；Esc 取消。";
+    el.wBtn.disabled = false;
+    el.wBtn.textContent = "写入";
 
-    var input = document.createElement("input");
-    input.className = "wi-edit";
-    input.value = current;
-
-    el.textContent = "";
-    el.classList.add("editing");
-    el.appendChild(input);
-    input.focus();
-    input.select(); // "鼠标直接选中对应值"
-
-    var done = false;
-    function finish(commit) {
-      if (done) return;
-      done = true;
-      el.classList.remove("editing");
-      var next = input.value;
-      el.textContent = fmtValue(item.value);
-      if (commit && next !== current) {
-        writeItem(nodeId, next);
-      }
-    }
-
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); finish(true); }
-      else if (e.key === "Escape") { e.preventDefault(); finish(false); }
-    });
-    input.addEventListener("blur", function () { finish(true); });
+    el.write.classList.remove("hidden");
+    el.card.classList.add("editing");
+    state.editingNodeId = nodeId;
+    el.input.focus();
+    el.input.select();
   }
 
-  async function writeItem(nodeId, newVal) {
+  function cancelEdit(nodeId) {
+    var el = state.watchEls[nodeId];
+    if (state.editingNodeId === nodeId) state.editingNodeId = "";
+    if (!el) return;
+    el.write.classList.add("hidden");
+    el.card.classList.remove("editing");
+    el.wBtn.disabled = false;
+    el.wBtn.textContent = "写入";
+    paintItem(nodeId);
+  }
+
+  function commitEdit(nodeId) {
+    var el = state.watchEls[nodeId];
+    if (!el || state.editingNodeId !== nodeId) return;
+    writeItem(nodeId, el.input.value, el.dtSel.value);
+  }
+
+  async function writeItem(nodeId, newVal, dataType) {
     var item = findItem(nodeId);
+    var el = state.watchEls[nodeId];
     if (!item) return;
     var before = readValueText(nodeId);
+
+    if (el) {
+      el.wBtn.disabled = true;
+      el.wBtn.textContent = "写入中…";
+      el.note.textContent = "正在下发到设备…";
+    }
 
     var res;
     try {
@@ -965,19 +1141,35 @@
           // "Auto" makes the backend read the node's DataType attribute. Sending a guessed
           // type here (the previous behaviour: last read type, or "String" when unknown)
           // is exactly what produced BadTypeMismatch on every numeric point.
-          { id: state.connectionId, nodeId: nodeId, dataType: "Auto", value: newVal },
+          {
+            id: state.connectionId,
+            nodeId: nodeId,
+            dataType: dataType || "Auto",
+            value: newVal,
+          },
           20000
         )
       ) || {};
     } catch (e) {
       flash(nodeId, false);
       toast("写入失败：" + msg(e), true);
+      if (el) { // keep the row open so the value can be fixed and re-sent
+        el.wBtn.disabled = false;
+        el.wBtn.textContent = "写入";
+        el.note.textContent = "写入失败：" + msg(e);
+      }
       return;
     }
 
     if (res.success === false) {
       flash(nodeId, false);
-      toast("写入失败：" + writeFailText(res), true);
+      var why = writeFailText(res);
+      toast("写入失败：" + why, true);
+      if (el) {
+        el.wBtn.disabled = false;
+        el.wBtn.textContent = "写入";
+        el.note.textContent = "写入失败：" + why;
+      }
       return;
     }
 
@@ -996,7 +1188,21 @@
         "写入被接受但值未变化：" + (item.displayName || nodeId) + " 可能只读或被程序覆盖",
         true
       );
+      if (el) {
+        el.wBtn.disabled = false;
+        el.wBtn.textContent = "写入";
+        el.note.textContent = "已下发，但回读值仍是 " + after + "：可能被程序覆盖或只读。";
+      }
       return;
+    }
+
+    // Success: close the row, the refreshed value is already painted.
+    state.editingNodeId = "";
+    if (el) {
+      el.write.classList.add("hidden");
+      el.card.classList.remove("editing");
+      el.wBtn.disabled = false;
+      el.wBtn.textContent = "写入";
     }
     flash(nodeId, true);
     toast("已写入 " + (item.displayName || nodeId) + " = " + newVal);
@@ -1096,14 +1302,30 @@
     }
     await window.dbxPlugin.ready;
 
-    bindDrop();
-    bindLayout();
+    bindLayout(); // column widths; dragging points needs no board listener —
+                  // the pointer drag hit-tests the pane rectangles itself.
 
     $("useBtn").addEventListener("click", function () {
       useConnection($("connId").value.trim() || $("connSelect").value);
     });
     $("connSelect").addEventListener("change", function () {
       if ($("connSelect").value) useConnection($("connSelect").value);
+    });
+
+    // The switcher is collapsed by default: the host already opened this
+    // workbench for one connection, so picking one by hand is the exception.
+    $("connToggle").addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      openConnPanel();
+    });
+    $("connClose").addEventListener("click", function () { openConnPanel(false); });
+    document.addEventListener("click", function (ev) {
+      if (!connPanel || connPanel.classList.contains("hidden")) return;
+      if (connPanel.contains(ev.target) || ev.target === $("connToggle")) return;
+      openConnPanel(false);
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") openConnPanel(false);
     });
     $("pollBtn").addEventListener("click", function () {
       if (state.polling) stopPolling(); else startPolling();
@@ -1114,6 +1336,7 @@
     $("clearWatch").addEventListener("click", function () {
       if (!state.watch.length) return;
       state.watch = [];
+      state.editingNodeId = "";
       saveWatch();
       renderWatch();
       syncWatchButtons();
@@ -1137,8 +1360,9 @@
     } else {
       // Never fall back to an unrelated connection (that is how a Modbus device
       // used to show up here).
+      setConnLabel("未选择连接", "");
       setStatus("未发现 OPC UA 连接", "err");
-      toast("未发现 OPC UA 连接，请在上方选择或填写连接 ID", true);
+      toast("未发现 OPC UA 连接：点右上角「切换」选择或手动填写连接 ID", true);
     }
 
     if (typeof window.dbxPlugin.onContext === "function") {

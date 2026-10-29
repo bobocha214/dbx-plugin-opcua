@@ -17,11 +17,11 @@
   "source": "https://github.com/bobocha214/dbx-plugin-opcua",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "license": "MIT",
-  "releaseNotes": "v0.2.1 更新说明：\n- 修复插件不兼容报错：连接贡献点引用的 workbench 已更正为 io.github.yuzhi.opcua.workbench，加载时不再报 “references missing workbench”。\n- 连接表单中文化：「信任任意服务器证书（不安全）」开关的标签与说明已全部改为中文。\n- 安全：默认校验服务器证书；仅当用户在可信内网等环境主动勾选该开关时，才放行自签名 / 任意证书（用于连接自签 PLC）。\n- 许可证：安装包内已包含 LICENSE（MIT）与 THIRD-PARTY（MPL-2.0 第三方声明，因静态链接 async-opcua 0.19）。\n- 写入行为：在监视面板里直接改值，回车或失焦即下发到服务器，并回读比对。\n- 升级提示：从 0.1.0 升级无需重新添加连接；若曾安装早期 bobocha214 命名空间的包，请删除旧连接后重新添加（身份不同，连接不共享）。",
+  "releaseNotes": "v0.2.3 更新说明：\n- 图标换用官方 OPC UA wordmark SVG（assets/plugin.svg），插件列表与连接表单直接渲染矢量图，任意 DPI 下都清晰；工作台标题栏使用同一 SVG 的紧凑裁剪版（viewBox 收到 wordmark 实际占位），以 96×22 宽幅 lockup 显示，不再挤在方形小框里。\n- 修复点位拖不进点位区：禁用原生 HTML5 拖拽（它在 WebView2 里会先发 pointercancel 取消拖拽，且 drop 常常不送达），改为 pointer 单通道拖拽 + 面板矩形命中判定；没有 PointerEvent 的环境自动退回 mousedown/mousemove/mouseup。\n- 加入点位区的其他方式：树上 Variable 行的「＋」常驻可见，双击行即可加入，详情面板也有「加入点位区」。\n- 顶部栏精简为状态条：只显示当前连接名、短 ID 与连接状态，连接切换折叠进「切换」面板（手动填写连接 ID 仍可用），点外部或 Esc 收起。\n- 写入改为显式触发：点位区卡片内点数值或 ✎ 就地展开整行编辑（类型下拉 + 值输入），只有点「写入」按钮才下发（回车等同按钮，Esc 取消）；失焦不再自动写入，避免轮询或点击抢焦点时误下发。\n- 写入过程可见：按钮变「写入中…」并禁用，成功后自动回读、单元格绿色闪烁；失败保留已填内容、红色闪烁并提示服务器返回的状态码与原因。\n- 详情面板写入表单改为整行布局，值输入框加高到 36px。\n- 后端身份版本号改为读取 Cargo.toml（env!(\"CARGO_PKG_VERSION\")），不再硬编码，避免升级后启动报 “backend identity does not match manifest”。",
   "localizations": {
     "zh-CN": {
       "name": "OPC UA",
-      "description": "浏览 PLC 和 OPC UA 服务器的地址空间，按数据类型读取并写入节点值。"
+      "description": "浏览 PLC 和 OPC UA 服务器的地址空间，按数据类型读取节点值；改值后点击「写入」按钮才下发。"
     }
   }
 }

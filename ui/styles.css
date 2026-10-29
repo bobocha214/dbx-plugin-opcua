@@ -23,11 +23,18 @@ html, body {
   font-size: 13px;
 }
 
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .topbar {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 14px;
+  gap: 12px;
+  padding: 7px 14px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
@@ -35,20 +42,74 @@ html, body {
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--accent);
 }
 
-.conn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  flex-wrap: wrap;
+/* Brand mark: the official OPC UA wordmark is 464x104, so it is shown as a
+   wide lockup instead of a square - a 36px square would squash it to ~7px. */
+.brand img {
+  display: block;
+  width: 96px;
+  height: 22px;
 }
 
-.conn input, .conn select {
+/* Right-hand status strip: current connection + state + a collapsed switcher. */
+.conn-bar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.conn-name {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.conn-toggle {
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.conn-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.conn-toggle[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+.conn-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 12px;
+  z-index: 30;
+  width: 340px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.14);
+}
+.conn-panel.hidden { display: none; }
+
+.cp-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.cp-row > span { flex: none; width: 48px; }
+.cp-row select, .cp-row input {
+  flex: 1;
+  min-width: 0;
   height: 28px;
   padding: 0 8px;
   border: 1px solid var(--border);
@@ -57,10 +118,8 @@ html, body {
   color: var(--text);
 }
 
-#connSelect { width: 220px; }
-#connId { width: 160px; }
-
-.conn button {
+.cp-actions { display: flex; gap: 6px; }
+.cp-actions button {
   height: 28px;
   padding: 0 14px;
   border: none;
@@ -69,24 +128,29 @@ html, body {
   color: #fff;
   cursor: pointer;
 }
+.cp-actions button.ghost { background: #fff; color: var(--muted); border: 1px solid var(--border); }
+.cp-actions button:hover { filter: brightness(1.06); }
+.cp-actions button.ghost:hover { filter: none; border-color: var(--accent); color: var(--accent); }
 
-.conn button:hover { filter: brightness(1.08); }
+.cp-hint { margin: 0; font-size: 11px; line-height: 1.4; }
 
 .status {
-  margin-left: 4px;
+  flex: none;
   font-size: 12px;
   padding: 3px 8px;
   border-radius: 10px;
   background: var(--accent-soft);
   color: var(--accent);
+  white-space: nowrap;
 }
 
 .status.ok { background: #e6f4ea; color: var(--ok); }
 .status.err { background: #fdecea; color: var(--err); }
 
+/* Three columns fill whatever height is left under the top bar. */
 .layout {
   display: flex;
-  height: calc(100% - 47px);
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -199,8 +263,11 @@ body.col-drag * {
 
 .node-row:hover { background: var(--row-hover); }
 .node-row.selected { background: var(--accent-soft); }
-.node-row[draggable="true"] { cursor: grab; }
-.node-row.dragging { opacity: .5; }
+.node-row { cursor: grab; }
+/* No native HTML5 drag: it cancels the pointer drag and its drop never lands in
+   some host webviews. Also stop text/image dragging inside a row. */
+.node-row, .node-row * { -webkit-user-drag: none; }
+.node-row.drag-src { opacity: .5; }
 
 .twisty {
   width: 14px;
@@ -237,7 +304,7 @@ body.col-drag * {
   font-size: 13px;
   cursor: pointer;
   padding: 0;
-  opacity: 0;
+  opacity: .5;
   transition: opacity .12s;
 }
 .node-row:hover .watch-add { opacity: 1; }
@@ -292,14 +359,26 @@ body.col-drag * {
   margin-bottom: 6px;
 }
 
+/* One card per point: the read-only row plus an inline write row that is only
+   revealed when you start editing. */
+.watch-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background: #fff;
+  overflow: hidden;
+}
+.watch-card:hover { border-color: #c3c8d0; }
+.watch-card.selected { border-color: var(--accent); }
+.watch-card.selected .watch-item { background: var(--accent-soft); }
+
 .watch-item {
   display: flex; align-items: center; gap: 8px;
-  padding: 6px 8px; border: 1px solid var(--border);
-  border-radius: 6px; margin-bottom: 6px; background: #fff;
+  padding: 6px 8px;
   cursor: pointer;
 }
 .watch-item:hover { background: var(--row-hover); }
-.watch-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+.watch-card.editing { border-color: var(--accent); }
 
 .wi-main { flex: 1; min-width: 0; }
 .wi-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -307,7 +386,7 @@ body.col-drag * {
 
 .wi-val { flex: none; display: flex; align-items: center; gap: 6px; }
 
-/* the value itself — click to edit, Enter to write */
+/* the value itself — click to edit; writing happens only via the 写入 button */
 .wi-v {
   min-width: 84px; max-width: 260px;
   padding: 3px 7px; border: 1px solid transparent; border-radius: 5px;
@@ -317,25 +396,114 @@ body.col-drag * {
   user-select: all;
 }
 .wi-v:hover { border-color: var(--accent); }
-.wi-v.editing { padding: 0; background: #fff; }
 .wi-v.flash-ok { background: #e6f4ea; }
 .wi-v.flash-err { background: #fdecea; }
 .wi-v.stale { color: var(--muted); }
 
-.wi-edit {
-  width: 150px; height: 26px; padding: 0 7px;
-  border: 1px solid var(--accent); border-radius: 5px; outline: none;
-  font: inherit; font-variant-numeric: tabular-nums;
+/* inline write row inside the card */
+.wi-write {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px;
+  border-top: 1px dashed var(--border);
+  background: #fafbfc;
+}
+.wi-write.hidden { display: none; }
+
+.wi-input {
+  flex: 1 1 180px;
+  min-width: 130px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  outline: none;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.wi-dt-sel {
+  flex: 0 0 auto;
+  height: 30px;
+  max-width: 130px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.wi-btn {
+  flex: none;
+  height: 30px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+.wi-btn:hover { filter: brightness(1.08); }
+.wi-btn[disabled] { opacity: .6; cursor: default; filter: none; }
+.wi-btn.ghost {
+  background: #fff;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.wi-btn.ghost:hover { filter: none; border-color: var(--accent); color: var(--accent); }
+
+.wi-write-note {
+  flex: 1 0 100%;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .wi-dt { font-size: 11px; color: var(--muted); min-width: 52px; }
 
+/* pencil: opens the inline write row without hunting for the value pill */
+.wi-edit-btn {
+  flex: none; width: 22px; height: 22px; padding: 0;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: #fff; color: var(--muted); cursor: pointer;
+  font-size: 12px; line-height: 20px;
+}
+.wi-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 .wi-del {
-  flex: none; width: 20px; height: 20px; padding: 0;
+  flex: none; width: 22px; height: 22px; padding: 0;
   border: none; border-radius: 4px; background: transparent;
-  color: var(--muted); cursor: pointer; font-size: 14px; line-height: 18px;
+  color: var(--muted); cursor: pointer; font-size: 14px; line-height: 20px;
 }
 .wi-del:hover { background: #fdecea; color: var(--err); }
+
+/* ---------------- Custom drag (pointer based) ---------------- */
+.drag-ghost {
+  position: fixed;
+  z-index: 999;
+  pointer-events: none;
+  max-width: 320px;
+  padding: 4px 10px;
+  background: #fff;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--accent);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, .18);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.dnd-active, body.dnd-active * { user-select: none !important; cursor: grabbing !important; }
+.node-row.drag-src { opacity: .5; }
 
 .detail .kv { display: grid; grid-template-columns: 92px 1fr; gap: 6px 10px; margin-bottom: 12px; }
 .detail .kv .k { color: var(--muted); }
@@ -353,18 +521,50 @@ body.col-drag * {
 .value-box .big { font-size: 16px; font-weight: 600; word-break: break-all; }
 .value-box .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
-.write-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.write-form select, .write-form input {
-  height: 28px;
+/* Detail-pane write form: stacked so the value box is a full-width line. */
+.write-form { display: flex; flex-direction: column; gap: 8px; }
+.wf-row { display: flex; align-items: center; gap: 8px; }
+.wf-lbl { flex: none; min-width: 34px; font-size: 12px; color: var(--muted); }
+
+.write-form select {
+  flex: 1;
+  height: 32px;
   padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-size: 12px;
 }
-.write-form input { flex: 1; min-width: 0; }
+
+.write-form input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.write-form input:focus { border-color: var(--accent); outline: none; }
+
 .write-form button {
-  height: 28px; padding: 0 14px; border: none; border-radius: 6px;
-  background: var(--accent); color: #fff; cursor: pointer;
+  flex: none;
+  height: 32px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
 }
+.write-form button:hover { filter: brightness(1.08); }
+.write-form button[disabled] { opacity: .6; cursor: default; filter: none; }
+
+#writeRes { flex: 1; min-width: 0; font-size: 11.5px; line-height: 1.4; }
 
 .watch-btn, #readBtn {
   height: 28px; padding: 0 14px; border: none; border-radius: 6px;

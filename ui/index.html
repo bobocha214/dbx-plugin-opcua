@@ -7,16 +7,37 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- Top bar: a status strip, not a connection form. The host opens this
+       workbench for one specific connection, so switching is the exception
+       and lives behind the "切换" button. -->
   <header class="topbar">
     <div class="brand">
-      <img src="icon.svg" alt="OPC UA" width="22" height="22" />
+      <img src="icon.svg" alt="OPC UA" width="96" height="22" />
       <span>OPC UA 浏览器</span>
     </div>
-    <div class="conn">
-      <select id="connSelect" title="选择 OPC UA 连接"></select>
-      <input id="connId" type="text" placeholder="连接 ID（手动）" title="宿主未暴露连接列表时手动填写" />
-      <button id="useBtn">使用此连接</button>
+
+    <div class="conn-bar">
+      <span id="connName" class="conn-name" title="当前连接">未选择连接</span>
       <span id="status" class="status">未连接</span>
+      <button id="connToggle" class="conn-toggle" aria-expanded="false"
+              title="切换连接 / 手动填写连接 ID">切换</button>
+    </div>
+
+    <div id="connPanel" class="conn-panel hidden">
+      <label class="cp-row">
+        <span>连接</span>
+        <select id="connSelect" title="选择 OPC UA 连接"></select>
+      </label>
+      <label class="cp-row">
+        <span>连接 ID</span>
+        <input id="connId" type="text" placeholder="手动填写"
+               title="宿主未暴露连接列表时手动填写" />
+      </label>
+      <div class="cp-actions">
+        <button id="useBtn">使用此连接</button>
+        <button id="connClose" class="ghost">关闭</button>
+      </div>
+      <p class="cp-hint hint">填写「连接 ID」后点「使用此连接」优先生效。</p>
     </div>
   </header>
 
@@ -50,8 +71,8 @@
       <div id="dropHint" class="drop-hint">
         <div class="drop-hint-inner">
           <div class="drop-icon">⇢</div>
-          <p>把左侧地址空间中的 <b>Variable</b> 点位拖到这里</p>
-          <p class="hint">拖动后可在此持续观察数值，点击数值即可改写并下发。</p>
+          <p>把左侧地址空间中的 <b>Variable</b> 点位<b>拖到这里</b></p>
+          <p class="hint">也可以点树上的 <b>＋</b> 或双击点位；加入后可在此持续观察，并<strong>就地改值、点「写入」下发</strong>。</p>
         </div>
       </div>
     </section>
@@ -71,7 +92,7 @@
   <div id="toast" class="toast"></div>
 
   <footer class="footnote">
-    连接会直连你填写的 <code>opc.tcp://主机:端口</code>（默认 4840）。修改数值后<strong>回车或移开焦点即下发写入</strong>，请确认无误再改。
+    写入只在点击 <strong>「写入」按钮</strong> 后才下发（回车等同于点按钮，<code>Esc</code> 取消）；改值不会自动生效。
   </footer>
 
   <script src="app.js"></script>

@@ -3,10 +3,10 @@
   "manifest_version": 1,
   "id": "io.github.yuzhi.opcua",
   "name": "OPC UA",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "publisher": "yuzhi",
-  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values. Connects directly to the opc.tcp://host:port you enter (default 4840). Server certificates are verified by default; only enable 'trust any certificate' on an isolated network. Editing a watched value and pressing Enter (or moving focus) writes it immediately.",
-  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.1",
+  "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values. Connects directly to the opc.tcp://host:port you enter (default 4840). Server certificates are verified by default; only enable 'trust any certificate' on an isolated network. Watched values are edited in place and only sent to the device when you click 写入 (Write).",
+  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.3",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "icon": "assets/plugin.svg",
   "engines": {
@@ -98,7 +98,7 @@
   "localizations": {
     "zh-CN": {
       "name": "OPC UA",
-      "description": "OPC UA 客户端读写插件：连接 PLC/服务器，浏览地址空间，读取与写入节点值。会直连你填写的 opc.tcp://主机:端口（默认 4840）；默认校验证书，仅在内网等可信环境才勾选“信任任意证书”；修改监视值后回车或移开焦点即下发写入。",
+      "description": "OPC UA 客户端读写插件：连接 PLC/服务器，浏览地址空间，读取与写入节点值。会直连你填写的 opc.tcp://主机:端口（默认 4840）；默认校验证书，仅在内网等可信环境才勾选“信任任意证书”；在点位区就地改值后，只有点击「写入」按钮才会下发。",
       "contributions": {
         "io.github.yuzhi.opcua.connection": {
           "label": "OPC UA 连接",

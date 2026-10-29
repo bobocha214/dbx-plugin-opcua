@@ -38,7 +38,7 @@ maintainers.
 - **Workbench ("OPC UA browser")** — three-column layout with draggable dividers: address space tree (`Objects` / `Views` / `Types`), attribute/details panel, and a watch board where `Variable` nodes are dropped. The board polls the watched points; a value can be edited in place. Writes resolve the node's `DataType` attribute server-side, surface the OPC UA status code on failure, and read the value back.
 - Sidecar methods: `plugin/initialize`, `connection/test`, `connection/connect`, `connection/disconnect`, `opcua/root`, `opcua/browse`, `opcua/read`, `opcua/readMany`, `opcua/write`.
 - Not implemented: method calls (`Call`), subscriptions / monitored items, historical reads, `Sign` / `SignAndEncrypt`.
-- Icons (`assets/plugin.svg`, `assets/connection.svg`, `ui/icon.svg`) are self-contained 64×64 SVGs — no external references, no raster data, no `<script>`.
+- Icons: `assets/plugin.svg` is the official OPC UA wordmark SVG (512×512 canvas, the mark itself embedded as one base64 PNG — no external references, no `<script>`, no remote fonts); all three manifest icon slots (plugin, connection provider, workbench) point at it. `ui/icon.svg` is the same file with its `viewBox` cropped to the mark (`24 204 464 104`) so the workbench title bar can show it as a 96×22 lockup instead of a tiny square.
 
 ## Permissions, data access, and network access
 

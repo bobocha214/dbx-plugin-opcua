@@ -14,7 +14,7 @@
 dbx-plugin-opcua/
 ├── manifest.json              # 插件契约：身份、权限、入口、contributions
 ├── dbx-plugin.toml            # 包描述符（schema_version / backend / package.include）
-├── assets/                    # plugin.svg、connection.svg
+├── assets/                    # plugin.svg（官方 OPC UA wordmark，512×512）
 ├── ui/                        # 沙箱工作台（index.html、styles.css、app.js、icon.svg）
 ├── backend/                   # Rust sidecar（Cargo.toml、src/main.rs）
 ├── scripts/                   # build-store-candidate.mjs（生成商店候选元数据）
@@ -26,14 +26,24 @@ dbx-plugin-opcua/
 
 ### 图标
 
-三个 SVG（`assets/plugin.svg`、`assets/connection.svg`、`ui/icon.svg`）遵循同一套规范，保证在宿主侧栏 16–24px 和商店大图 96px 下都清晰：
+图标直接用 OPC UA 官方素材，与 `dbx-plugin-modbus` 保持一致（宿主支持 SVG 图标）：
 
-- `viewBox="0 0 64 64"`，背景**满幅** `rect 0 0 64 64`（不内缩），圆角 `rx="16"`；
-- 背景用垂直 `linearGradient`（`#4F8EF7 → #1E3A8A`）而不是平涂色，与同发布者的 Modbus 插件（`#60A5FA → #0D9488`）属于同一视觉家族；
-- 根节点**不写死 `width`/`height`**，由宿主按容器尺寸缩放，避免在 20–24px 芯片里被裁切或出现留白；
-- 线条粗细按 64 画布给到 `5`（小尺寸下不糊），图形元素控制在 3 个以内。
+- `assets/plugin.svg`（512×512）：官方 wordmark SVG，`manifest.json` 的根节点 `icon`、
+  connection-provider 与 workbench 的 `icon` 都指向它；商店候选元数据的 `icon` 指向仓库同路径文件。
+- `ui/icon.svg`：同一份 SVG，但 `viewBox` 收到 `24 204 464 104`（wordmark 实际占位），
+  供工作台标题栏按 96×22 显示。官方图是 4.48:1 的横条，套进 36px 方框里只剩约 7px 高，
+  所以标题栏用宽幅 lockup 而不是方块。
 
-`ui/icon.svg` 与 `assets/plugin.svg` 内容保持一致（工作台标题栏与插件列表使用同一图形）。
+来源是 `dbx-official-center-only-svg/dbx-opcua-official-center-only.svg`（512 画布里居中放一张
+448×100 的透明 PNG，带 `feDropShadow`）。
+
+> 之前两版自绘图标（渐变底板 + OPC/UA 字样）已弃用，相关脚本保留为备用工具：
+> `scripts/official_icon.py`（从官方 SVG 生成带底板的 PNG，深色侧栏下更安全）、
+> `scripts/draw_icon.py`（纯几何 SDF 绘制，不依赖官方素材）、`scripts/refit_icons.py --check`
+> （量图形在画布中的占比）。若哪天宿主不支持 SVG，用 `official_icon.py` 生成 PNG 并把
+> `manifest.json` 里的三处 `.svg` 改回 `.png` 即可。
+
+历史：最初是浅底横排 "OPC UA" 文字（只占板高 1/3，小尺寸又小又糊），已全部被这一版替代。
 
 ## 打包
 
@@ -51,6 +61,18 @@ dbx-plugin package . --target windows-x64 --output-dir dist
 dist/io.github.yuzhi.opcua-0.2.0-<target>.dbxp
 dist/io.github.yuzhi.opcua-0.2.0-<target>.artifact.json
 ```
+
+### 升级版本号（必须三处同步）
+
+后端 sidecar 在 `plugin/initialize` 时会上报身份 `id/version`，宿主要求它与 `manifest.json` 完全一致，
+否则启动即报 `Plugin backend identity '<id>/<old>' does not match manifest '<id>/<new>'`。
+
+1. `manifest.json`：`version` 与 `source`（`.../tree/vX.Y.Z`）；
+2. `backend/Cargo.toml`：`version` —— `src/main.rs` 里 `PLUGIN_VERSION` 用的是
+   `env!("CARGO_PKG_VERSION")`，改这里即可，不要再手写常量；
+3. `backend/Cargo.lock`：CLI 以 `--locked` 构建，不同步会报 `cannot update the lock file`。
+
+`store/candidates/*.json` 的 `version` / `icon` / `source` 由 `scripts/build-store-candidate.mjs` 生成。
 
 本地安装测试：在 DBX 插件中心开启「允许安装未签名开发包」后安装该 `.dbxp`。
 
@@ -150,18 +172,25 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 > 安全边界：宿主返回给 UI 的连接列表是**脱敏的**（形如 `{ id, providerId, name, label }`，不含主机、端口、凭据）。因此 UI 不自行发起连接，只使用宿主已建立连接的 `connectionId`。
 
 ### 界面布局（三栏）
+- **顶部**：状态条。左侧是插件名，右侧显示**当前连接名 + 连接状态**（宿主打开工作区时已指定连接），「切换」按钮展开折叠面板，里面才是连接下拉与手动 `连接 ID`。连接由宿主管理，UI 不自行发起连接。
 - **左**：地址空间树（窄栏，默认 236px），加载三个标准根 `Objects` (`i=85`)、`Types` (`i=86`)、`Views` (`i=87`)；按 `HierarchicalReferences` 前向展开，自动翻页 continuation point。
 - **中**：点位区。把左侧树上的 `Variable` 点位**拖动**到这里即加入；拖入 `Object` / `Method` 等非 `Variable` 节点会被拒绝并提示原因。
-- **右**：选中点位的详细信息（NodeId / BrowseName / DisplayName / NodeClass）、当前值（可「读取」）、写入表单，以及加入/移出点位区。
+- **右**：选中点位的详细信息（NodeId / BrowseName / DisplayName / NodeClass）、当前值（可「读取」）、整行写入表单，以及加入/移出点位区。
 - 点击左侧树节点或中间点位卡片都能选中该点位，树行与卡片高亮联动，右侧详情随之切换。左侧树没有展开过的点位（例如从 `localStorage` 恢复的）同样可以查看详情。
 - **分栏宽度可拖动**：两条分隔条用鼠标拖动即可调整左/中/右三栏宽度（键盘聚焦后 `←` `→` 微调，`Shift` 加速），双击分隔条恢复默认 236 / 302，宽度按面板记在 `localStorage`；面板变窄时中间点位区保底 200px。
 - 把点位拖到**右侧详情区**也能直接查看该点位详情。
 
 ### 点位区（持续观察 + 就地改写下发）
-- 添加：从左侧树拖入；或树上 `Variable` 行悬停出现「＋」；或右侧详情点「加入点位区」。只有 `Variable` 可加入。
+- 加入点位区的三种方式（只有 `Variable` 可加入）：
+  1. **拖拽**：按住树上的点位行拖到中点位区（**只用 pointer 事件实现**：树行 `draggable=false`，
+     因为原生 HTML5 拖拽在 WebView2 里会先发 `pointercancel` 掐断拖拽、而它自己的 `drop` 又不送达，
+     两头落空；命中判定用面板矩形而非 `elementFromPoint`；无 `PointerEvent` 的环境自动退回鼠标事件）；
+  2. **＋ 按钮**：树上 `Variable` 行右侧常驻的「＋」；
+  3. **双击**树上 `Variable` 行，或右侧详情点「加入点位区」。
 - 观察：点「▶ 持续观察」，按 200ms / 500ms / 1s / 2s / 5s 间隔轮询；走 **`opcua/readMany` 一次批量读**，N 个点只花一次往返。上一轮未返回时自动跳过本轮，避免堆积。
-- 改值下发：**鼠标点击数值** → 变成已全选的输入框 → 改完回车（或失焦）即 `opcua/write` 下发；`Esc` 取消。写入成功后自动回读该点，单元格绿色闪烁；失败红色闪烁并提示服务器返回的状态码与原因。
-- 轮询期间**不会覆盖你正在编辑的单元格**；写入的数据类型由 sidecar 读取该节点的 `DataType` 属性决定（见下节），不依赖本地猜测。
+- 改值下发：**点数值**（或卡片上的 ✎）→ 卡片展开一行写入区（整行输入框 + 类型下拉）→ 改完**点「写入」按钮**才 `opcua/write` 下发；回车等同于点按钮，`Esc` / 「取消」放弃。**失焦不再自动写入**（旧行为会在轮询或点击抢走焦点时误下发）。
+- 写入过程：按钮变「写入中…」并禁用，成功后关闭写入区、自动回读该点、单元格绿色闪烁；失败保留写入区与已填内容，红色闪烁并提示服务器状态码与原因，可直接改完再点。
+- 轮询期间**不会覆盖你正在编辑的卡片**；写入的数据类型由 sidecar 读取该节点的 `DataType` 属性决定（见下节），不依赖本地猜测。
 - 点位区按连接 id 存 `localStorage`，切换连接后自动恢复；`×` 移除，「清空」全清。
 - 轮询失败会停止观察并提示（常见原因是会话未建立，需先在 DBX 中打开该连接以触发 `connection/connect`）。
 
@@ -203,7 +232,7 @@ PR 正文用 `store/PULL_REQUEST.md`（含 capabilities、permissions、data acc
 - **不再默认信任任何证书**。早期版本硬编码了 `trust_server_certs(true)`，会接受任意服务器证书且端点安全策略由服务器决定（可能协商到明文 `SecurityPolicy#None`），在「用户名 / 密码」认证下凭据可被中间人截获。0.2.0 起已移除该默认行为。
 - **客户端密钥**。客户端会生成自签的应用实例密钥对，但写入位于系统临时目录（`dbx-opcua-sidecar-pki`），**不会写入插件安装目录**，且每次运行重新生成。
 - **网络直连**。连接会直接连到你填写的 `opc.tcp://主机:端口`（默认 4840），无代理 / 中转之外的外部请求。
-- **写入即下发**。监控表中的数值在回车或移开焦点时立即 `opcua/write` 下发（写后有回读校验）；请确认数值无误再改。
+- **写入按需下发**。点位区/详情面板改值后，只有点击「写入」按钮才会 `opcua/write`（写后有回读校验）；请确认数值无误再点。改值本身不会自动生效，失焦也不会。
 
 ## 待替换 / 已知限制
 
