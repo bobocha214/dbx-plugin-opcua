@@ -3,10 +3,10 @@
   "manifest_version": 1,
   "id": "io.github.yuzhi.opcua",
   "name": "OPC UA",
-  "version": "0.2.3",
+  "version": "0.2.2",
   "publisher": "yuzhi",
   "description": "Browse the OPC UA address space of PLCs and servers, then read and write node values. Connects directly to the opc.tcp://host:port you enter (default 4840). Server certificates are verified by default; only enable 'trust any certificate' on an isolated network. Watched values are edited in place and only sent to the device when you click 写入 (Write).",
-  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.3",
+  "source": "https://github.com/bobocha214/dbx-plugin-opcua/tree/v0.2.2",
   "homepage": "https://github.com/bobocha214/dbx-plugin-opcua",
   "icon": "assets/plugin.svg",
   "engines": {

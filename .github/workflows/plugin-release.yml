@@ -1,8 +1,21 @@
 name: Release DBX plugin
 
-# Multi-platform packaging is handled by the upstream reusable workflow: it builds the
-# native sidecar once per OS/arch and publishes one unsigned .dbxp candidate per target.
+# Two triggers on purpose:
+#   * push of a v* tag  -> nobody created a Release yet, so `ensure-release` creates
+#                          one; `git tag vX.Y.Z && git push origin vX.Y.Z` is then
+#                          enough to publish a release and build the binaries.
+#   * release published -> a Release was published by hand (UI or API).
+#
+# Why the first trigger was missing until now: this workflow only listened to
+# `release: published`. GitHub treats a tag and a Release as two different
+# objects -- pushing a tag never emits a release event, so tagging alone did
+# nothing. Creating the Release *inside* this workflow (instead of relying on a
+# second workflow reacting to it) also avoids the dead end where an event created
+# with GITHUB_TOKEN fails to trigger further workflow runs.
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types: [published]
 
@@ -10,7 +23,35 @@ permissions:
   contents: write
 
 jobs:
+  ensure-release:
+    # Skipped on the `release` path: the Release already exists there.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Create the Release for the pushed tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "tag: $TAG"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists -- reusing it."
+          else
+            gh release create "$TAG" \
+              --verify-tag \
+              --title "$TAG" \
+              --generate-notes
+          fi
+
   release:
+    # Multi-platform packaging is handled by the upstream reusable workflow: it
+    # builds the native sidecar once per OS/arch and publishes one unsigned
+    # .dbxp candidate per target.
+    needs: ensure-release
+    # `needs:` alone would skip this job when ensure-release is skipped (the
+    # `release` path). The status check function keeps both paths alive.
+    if: ${{ !cancelled() && !failure() }}
     # Pinned to a commit SHA, not a branch: reusable workflows run with the
     # caller's permissions, so a moving ref is a supply-chain risk. Note that
     # `plugin-sdk-v1` (the ref `dbx-plugin create` emits) does NOT exist upstream
@@ -18,7 +59,8 @@ jobs:
     # To upgrade: take the new SHA of t8y2/dbx main and re-run one release.
     uses: t8y2/dbx/.github/workflows/plugin-release-reusable.yml@d030f4276f7922fbc2b0b844a20875991347ac79 # main @ 2026-10-21
     with:
-      release-tag: ${{ github.event.release.tag_name }}
+      # `github.event.release` is empty on the tag-push path, hence the fallback.
+      release-tag: ${{ github.event.release.tag_name || github.ref_name }}
       package-command: dbx-plugin package .
       package-path: dist/*.dbxp
       metadata-path: dist/*.artifact.json

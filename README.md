@@ -82,7 +82,7 @@ dist/io.github.yuzhi.opcua-0.2.0-<target>.artifact.json
 | Git 标签、Release 标题、`.dbx-store.json` 的 `releaseNotes` 首行 | `vX.Y.Z` | 面向人的展示名 |
 | 产物文件名（`.dbxp` / `.artifact.json`） | `<plugin-id>-X.Y.Z-<target>.dbxp` | `dbx-plugin` CLI 默认命名，**不要改名**：商店候选 URL 与签名工作流的逐字节校验都按这个名字生成 |
 
-即：包内与产物一律 `0.2.3`，凡是「说给人听」的地方统一 `v0.2.3`。
+即：包内与产物一律 `0.2.2`，凡是「说给人听」的地方统一 `v0.2.2`。
 
 本地安装测试：在 DBX 插件中心开启「允许安装未签名开发包」后安装该 `.dbxp`。
 
@@ -94,7 +94,7 @@ dist/io.github.yuzhi.opcua-0.2.0-<target>.artifact.json
 
 官方文档要求：**包含原生 Sidecar 的插件需按操作系统和 CPU 架构分别构建**，不存在一个跨平台的通用包（只有纯前端插件才能打 `universal` 包）。
 
-因此多平台通过 CI 实现：`.github/workflows/plugin-release.yml` 复用上游的 `t8y2/dbx/.github/workflows/plugin-release-reusable.yml`（pin 到 commit SHA，不用 `@plugin-sdk-v1` —— 该 ref 在上游并不存在），在 `release: published` 时**按目标平台各构建一个 `.dbxp`**，随 Release 发布：
+因此多平台通过 CI 实现：`.github/workflows/plugin-release.yml` 复用上游的 `t8y2/dbx/.github/workflows/plugin-release-reusable.yml`（pin 到 commit SHA，不用 `@plugin-sdk-v1` —— 该 ref 在上游并不存在），**按目标平台各构建一个 `.dbxp`**，随 Release 发布：
 
 | 平台 | target |
 |------|--------|
@@ -107,6 +107,27 @@ dist/io.github.yuzhi.opcua-0.2.0-<target>.artifact.json
 （上表即上游 reusable workflow 的默认 `build-matrix`；本仓库未覆盖它。）
 
 Release 需包含：每个平台的 `.dbxp` + 对应 `.artifact.json` + 汇总的 `release-candidates.json` + Release Notes 与源码 Tag。**不要把 `.dbxp` 提交进 Git 历史。**
+
+### 发布流程：打 tag 就等于发 Release
+
+```bash
+# 1. 先按上面的表格把三处版本号改成 X.Y.Z
+git commit -am "chore: bump to X.Y.Z"
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin main --follow-tags      # 推 tag 即触发
+```
+
+推送 `v*` tag 后，workflow 的 `ensure-release` job 会先用 `gh release create`
+把 Release 建好，随后 `release` job 调用上游 reusable workflow，把 5 个平台的
+`.dbxp` + `.artifact.json` + `release-candidates.json` 传上去。在网页上手动
+发布 Release（`release: published`）走的是同一条链路，只是跳过 `ensure-release`。
+
+> **为什么以前打 tag 不会自动发 Release**：GitHub 里 tag 和 Release 是两个独立对象。
+> 这个工作流原来只监听 `release: published`，而 `git push --tags` 只会创建 tag，
+> 永远不产生 release 事件，所以 CI 一次都不会跑。也**不要**改成"另开一个工作流监听
+> release 事件"：用默认 `GITHUB_TOKEN` 创建 Release 所产生的事件不会触发新的工作流
+> 运行（防递归），链路会断在这里。因此把"建 Release"放进同一个工作流当独立 job，
+> 再让打包 job `needs` 它。
 
 在本机只打当前平台包（例如 Windows）：
 
