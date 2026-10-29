@@ -31,14 +31,18 @@ jobs:
       - name: Create the Release for the pushed tag
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          echo "tag: $TAG"
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "tag: $TAG (repo: $REPO)"
+          # `--repo` is required: this job does not check out the repository, and
+          # `gh` otherwise tries to read the repo from the local git remote.
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
             echo "Release $TAG already exists -- reusing it."
           else
             gh release create "$TAG" \
+              --repo "$REPO" \
               --verify-tag \
               --title "$TAG" \
               --generate-notes
