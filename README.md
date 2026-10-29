@@ -74,6 +74,16 @@ dist/io.github.yuzhi.opcua-0.2.0-<target>.artifact.json
 
 `store/candidates/*.json` 的 `version` / `icon` / `source` 由 `scripts/build-store-candidate.mjs` 生成。
 
+### 版本命名规范（vx.x.x 用在哪、不用在哪）
+
+| 位置 | 格式 | 原因 |
+|------|------|------|
+| `manifest.json` / `Cargo.toml` / `Cargo.lock` / 包内元数据 | `X.Y.Z` | 纯 semver。宿主启动时校验 sidecar 上报的身份与 manifest 完全一致，Cargo 也不接受 `v` 前缀，**这里带 `v` 会直接启动失败** |
+| Git 标签、Release 标题、`.dbx-store.json` 的 `releaseNotes` 首行 | `vX.Y.Z` | 面向人的展示名 |
+| 产物文件名（`.dbxp` / `.artifact.json`） | `<plugin-id>-X.Y.Z-<target>.dbxp` | `dbx-plugin` CLI 默认命名，**不要改名**：商店候选 URL 与签名工作流的逐字节校验都按这个名字生成 |
+
+即：包内与产物一律 `0.2.3`，凡是「说给人听」的地方统一 `v0.2.3`。
+
 本地安装测试：在 DBX 插件中心开启「允许安装未签名开发包」后安装该 `.dbxp`。
 
 > CLI 会**自动为当前主机平台构建 Rust sidecar** 并放入包内 `bin/`，因此不需要手工 `cargo build` 再拷贝。
