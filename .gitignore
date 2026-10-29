@@ -20,3 +20,4 @@ backend/Cargo.lock
 
 # Local WorkBuddy session notes (kept on disk, not part of the plugin source)
 .workbuddy/
+/release-candidates.json
